@@ -45,7 +45,7 @@ DEMO_LEAVE_TYPE = "Casual Leave"
 
 
 def run():
-    _ensure_company()
+    _ensure_setup_wizard()
     _ensure_user_with_employee(DEMO_EMAIL, DEMO_PASSWORD, DEMO_FIRST_NAME, DEMO_LAST_NAME)
     _ensure_user_with_employee(MANAGER_EMAIL, MANAGER_PASSWORD, "Demo", "Manager")
     _ensure_project()
@@ -56,17 +56,38 @@ def run():
     print(f"Seed complete. Login: {DEMO_EMAIL} / {DEMO_PASSWORD}")
 
 
-def _ensure_company():
-    if not frappe.db.exists("Company", DEMO_COMPANY):
-        doc = frappe.get_doc({
-            "doctype": "Company",
-            "company_name": DEMO_COMPANY,
-            "abbr": DEMO_ABBR,
-            "default_currency": "SAR",
+def _ensure_setup_wizard():
+    """Run the ERPNext setup wizard with sensible defaults if not already run."""
+    if frappe.db.exists("Company", DEMO_COMPANY):
+        return
+    if frappe.db.exists("System Settings", "System Settings"):
+        ss = frappe.get_single("System Settings")
+        if ss.setup_complete:
+            # wizard already ran; fetch the existing company name instead of creating ours
+            existing = frappe.db.get_value("Company", {}, "name")
+            if existing:
+                globals()["DEMO_COMPANY"] = existing
+                return
+
+    try:
+        from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
+        setup_complete({
+            "language": "English",
             "country": "Saudi Arabia",
+            "timezone": "Asia/Riyadh",
+            "currency": "SAR",
+            "full_name": "Administrator",
+            "email": "admin@fatehhr.test",
+            "company_name": DEMO_COMPANY,
+            "company_abbr": DEMO_ABBR,
+            "company_tagline": "Fateh HR demo",
+            "fy_start_date": "2026-01-01",
+            "fy_end_date": "2026-12-31",
+            "chart_of_accounts": "Standard",
+            "bank_account": "Primary",
         })
-        doc.flags.ignore_permissions = True
-        doc.insert()
+    except Exception as e:  # noqa: BLE001
+        print(f"setup_wizard failed, continuing without: {e}")
 
 
 def _ensure_user_with_employee(email, password, first, last):
@@ -96,7 +117,7 @@ def _ensure_user_with_employee(email, password, first, last):
     if emp_name:
         return emp_name
 
-    emp = frappe.get_doc({
+    emp_data = {
         "doctype": "Employee",
         "first_name": first,
         "last_name": last,
@@ -105,8 +126,11 @@ def _ensure_user_with_employee(email, password, first, last):
         "gender": "Male",
         "date_of_birth": "1990-01-01",
         "date_of_joining": "2024-01-01",
-        "company": DEMO_COMPANY,
-    })
+    }
+    existing_company = frappe.db.get_value("Company", {}, "name")
+    if existing_company:
+        emp_data["company"] = existing_company
+    emp = frappe.get_doc(emp_data)
     emp.flags.ignore_permissions = True
     emp.insert()
     return emp.name
@@ -114,12 +138,15 @@ def _ensure_user_with_employee(email, password, first, last):
 
 def _ensure_project():
     if not frappe.db.exists("Project", DEMO_PROJECT):
-        frappe.get_doc({
+        data = {
             "doctype": "Project",
             "project_name": DEMO_PROJECT,
             "status": "Open",
-            "company": DEMO_COMPANY,
-        }).insert(ignore_permissions=True)
+        }
+        existing_company = frappe.db.get_value("Company", {}, "name")
+        if existing_company:
+            data["company"] = existing_company
+        frappe.get_doc(data).insert(ignore_permissions=True)
 
 
 def _ensure_tasks():
