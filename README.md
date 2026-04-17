@@ -11,7 +11,7 @@ with a hardened sync engine.
 - `docs/` — specs, implementation plans, lessons learned
 - `android-capacitor/` — Capacitor wrapper (Phase 5, not yet present)
 
-## Phase 1 status (2026-04-18)
+## Phase 1 + 2 status (2026-04-18)
 
 ✅ Backend
 - `fatehhr` Frappe app installed on a fresh `fatehhr_dev` site at GS DEV
@@ -36,11 +36,30 @@ with a hardened sync engine.
 - 401 silent-retry in the API client.
 - Version-compat probe on boot.
 
+✅ Phase 2 — Offline engine + Check-in
+- `idb` bootstrap with 4 stores (queue, photos, cache, meta).
+- `offline/queue.ts` — `saveItem(kind, logicalKey, payload, effectiveImages)`
+  with `(kind, logicalKey)` dedup; insertion-order preservation.
+- `offline/drain.ts` — drain engine; narrow-regex `isUnrecoverable`;
+  task-timer `start`→`stop` prerequisite gating.
+- `offline/photos.ts` — the **ONE uploader** (skill §4.3): memoises
+  `serverUrl` after first upload so drain-time retries never re-upload.
+- `offline/orphans.ts` — marks queue rows whose photo blobs are
+  missing; **never deletes** user work.
+- `SyncBar` (4 states) + `PhotoSlot` (auto-clears when blob missing)
+  + `BottomNav` + `ListRow` + `MapPreview` (Leaflet/OSM).
+- `fatehhr.api.checkin.create` + `list_mine` endpoints:
+  verified end-to-end with geofence classification.
+- Check-in view with GPS + reverse-geocode + geofence chip +
+  selfie-mode-aware `PhotoSlot` + online→queue fallback.
+- Check-in history view.
+
 ### Not here yet
 
-All of Phase 2+ (offline engine, check-in, calendar, leave, expense,
-tasks, payslip, announcements, notifications, profile edit, full
-dashboard, Capacitor wrap). See `docs/superpowers/plans/`.
+Phase 3 (Attendance calendar + Leave + Expense), Phase 4 (Tasks timer
++ Payslip + Announcements + Notifications + Profile + full Dashboard),
+Phase 5 (Capacitor wrap + APK + per-customer build + rollout).
+Plans for each at `docs/superpowers/plans/`.
 
 ## Testing Phase 1 locally
 
@@ -75,7 +94,7 @@ dashboard, Capacitor wrap). See `docs/superpowers/plans/`.
   profile display. (Seeded automatically — see Task 14 of the Phase 1
   plan.)
 
-### Test flow
+### Test flow — Phase 1 auth
 
 - [ ] Log in with `demo@fatehhr.test` / `demo@123` → redirected to PIN
       setup (4–6 digits). Pick `1234`.
@@ -86,6 +105,44 @@ dashboard, Capacitor wrap). See `docs/superpowers/plans/`.
 - [ ] Toggle to Arabic via the link on login → labels flip + `dir="rtl"`.
 - [ ] DevTools → Application → Manifest → `manifest.json` present with
       correct brand + theme color.
+
+### Test flow — Phase 2 check-in
+
+Manually navigate to http://localhost:5173/fatehhr/checkin (BottomNav
+→ Attendance tab) after logging in.
+
+- [ ] Online check-in: browser asks for GPS; map preview loads centered
+      on your coords; "Check In" writes to the server. Verify via
+      Desk: http://94.136.186.151/app/employee-checkin (open with Host
+      header tool or just log in as Administrator) — row exists with
+      timestamp + GPS coords.
+- [ ] Geofence chip: amber "Outside task radius" is the default when no
+      task is picked (task-picker UI lands in Phase 4; for Phase 2 you
+      can test the endpoint directly — see curl examples below).
+- [ ] Offline check-in: DevTools → Network → Throttle = Offline; tap
+      "Check In" → SyncBar flips to "1 change pending" → set online →
+      SyncBar flips to "Syncing" → "Synced now". Verify row appears on
+      the server.
+- [ ] Selfie mode: `CUSTOMER_SELFIE_MODE=every` in `.env` → PhotoSlot
+      required before Check In submits.
+
+### curl sanity checks (uses the seeded demo token)
+
+```bash
+# After logging in once to get api_key:api_secret pair
+AUTH="token <api_key>:<api_secret>"
+
+# List my check-ins
+curl -H "Host: fatehhr_dev" -H "Authorization: $AUTH" \
+  http://94.136.186.151/api/method/fatehhr.api.checkin.list_mine
+
+# Check in with task + GPS (expect custom_geofence_status: "inside"
+# because task TASK-2026-00001 has radius 100m at these coords)
+curl -X POST -H "Host: fatehhr_dev" -H "Authorization: $AUTH" \
+  -H "Content-Type: application/json" \
+  -d '{"log_type":"IN","latitude":24.7136,"longitude":46.6753,"task":"TASK-2026-00001","timestamp":null}' \
+  http://94.136.186.151/api/method/fatehhr.api.checkin.create
+```
 
 ## Server quick reference
 
