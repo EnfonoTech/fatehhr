@@ -4,8 +4,10 @@ import App from "@/app/App.vue";
 import { createAppRouter } from "@/app/router";
 import { appI18n, setLocale } from "@/app/i18n";
 import { useSessionStore } from "@/stores/session";
+import { useSyncStore } from "@/stores/sync";
 import { utilApi } from "@/api/util";
 import { NATIVE_VERSION } from "@/app/native-version";
+import "@/offline/processors/checkin";
 import "@/styles/tokens.css";
 import "@/styles/base.css";
 const app = createApp(App);
@@ -16,6 +18,11 @@ setLocale(appI18n.global.locale.value);
 app.mount("#app");
 // ---- post-mount wiring ----
 const session = useSessionStore();
+const sync = useSyncStore();
+void sync.refresh().then(() => {
+    if (sync.isOnline && sync.pending > 0)
+        return sync.triggerDrain();
+});
 ["pointerdown", "keydown", "touchstart", "focus"].forEach((ev) => window.addEventListener(ev, () => session.bumpActivity(), { passive: true }));
 setInterval(() => {
     if (session.shouldReprompt()) {
