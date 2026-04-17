@@ -117,6 +117,12 @@ def _ensure_user_with_employee(email, password, first, last):
     if emp_name:
         return emp_name
 
+    # Ensure required link targets exist
+    if not frappe.db.exists("Gender", "Male"):
+        frappe.get_doc({"doctype": "Gender", "gender": "Male"}).insert(ignore_permissions=True)
+    if not frappe.db.exists("Gender", "Female"):
+        frappe.get_doc({"doctype": "Gender", "gender": "Female"}).insert(ignore_permissions=True)
+
     emp_data = {
         "doctype": "Employee",
         "first_name": first,
