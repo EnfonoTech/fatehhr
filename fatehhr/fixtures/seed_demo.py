@@ -48,8 +48,8 @@ def run():
     _ensure_setup_wizard()
     _ensure_user_with_employee(DEMO_EMAIL, DEMO_PASSWORD, DEMO_FIRST_NAME, DEMO_LAST_NAME)
     _ensure_user_with_employee(MANAGER_EMAIL, MANAGER_PASSWORD, "Demo", "Manager")
-    _ensure_project()
-    _ensure_tasks()
+    project_name = _ensure_project()
+    _ensure_tasks(project_name)
     _ensure_leave_allocation(DEMO_EMAIL)
     _ensure_announcement()
     frappe.db.commit()
@@ -142,28 +142,33 @@ def _ensure_user_with_employee(email, password, first, last):
     return emp.name
 
 
-def _ensure_project():
-    if not frappe.db.exists("Project", DEMO_PROJECT):
-        data = {
-            "doctype": "Project",
-            "project_name": DEMO_PROJECT,
-            "status": "Open",
-        }
-        existing_company = frappe.db.get_value("Company", {}, "name")
-        if existing_company:
-            data["company"] = existing_company
-        frappe.get_doc(data).insert(ignore_permissions=True)
+def _ensure_project() -> str:
+    existing = frappe.db.get_value("Project", {"project_name": DEMO_PROJECT}, "name")
+    if existing:
+        return existing
+    data = {
+        "doctype": "Project",
+        "project_name": DEMO_PROJECT,
+        "status": "Open",
+    }
+    existing_company = frappe.db.get_value("Company", {}, "name")
+    if existing_company:
+        data["company"] = existing_company
+    doc = frappe.get_doc(data)
+    doc.flags.ignore_permissions = True
+    doc.insert()
+    return doc.name
 
 
-def _ensure_tasks():
+def _ensure_tasks(project_name: str):
     employee_user = DEMO_EMAIL
     for t in DEMO_TASKS:
-        name = frappe.db.get_value("Task", {"subject": t["subject"], "project": DEMO_PROJECT}, "name")
+        name = frappe.db.get_value("Task", {"subject": t["subject"], "project": project_name}, "name")
         if not name:
             task = frappe.get_doc({
                 "doctype": "Task",
                 "subject": t["subject"],
-                "project": DEMO_PROJECT,
+                "project": project_name,
                 "status": "Open",
                 "priority": "Medium",
                 "custom_latitude": t["latitude"],
