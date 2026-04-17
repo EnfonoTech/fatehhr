@@ -1,0 +1,123 @@
+[
+  {
+    "doctype": "Custom Field",
+    "name": "Employee-custom_pin_hash",
+    "dt": "Employee",
+    "fieldname": "custom_pin_hash",
+    "label": "PIN Hash",
+    "fieldtype": "Password",
+    "insert_after": "user_id",
+    "hidden": 1,
+    "no_copy": 1,
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee-custom_api_secret",
+    "dt": "Employee",
+    "fieldname": "custom_api_secret",
+    "label": "API Secret",
+    "fieldtype": "Password",
+    "insert_after": "custom_pin_hash",
+    "hidden": 1,
+    "no_copy": 1,
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_latitude",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_latitude",
+    "label": "Latitude",
+    "fieldtype": "Float",
+    "insert_after": "device_id",
+    "module": "Fatehhr",
+    "precision": "8"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_longitude",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_longitude",
+    "label": "Longitude",
+    "fieldtype": "Float",
+    "insert_after": "custom_latitude",
+    "module": "Fatehhr",
+    "precision": "8"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_location_address",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_location_address",
+    "label": "Location Address",
+    "fieldtype": "Small Text",
+    "insert_after": "custom_longitude",
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_task",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_task",
+    "label": "Task",
+    "fieldtype": "Link",
+    "options": "Task",
+    "insert_after": "custom_location_address",
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_selfie",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_selfie",
+    "label": "Selfie",
+    "fieldtype": "Attach Image",
+    "insert_after": "custom_task",
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_geofence_status",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_geofence_status",
+    "label": "Geofence Status",
+    "fieldtype": "Select",
+    "options": "disabled\ninside\noutside\nunknown",
+    "default": "disabled",
+    "insert_after": "custom_selfie",
+    "module": "Fatehhr"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Task-custom_latitude",
+    "dt": "Task",
+    "fieldname": "custom_latitude",
+    "label": "Latitude",
+    "fieldtype": "Float",
+    "insert_after": "project",
+    "module": "Fatehhr",
+    "precision": "8"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Task-custom_longitude",
+    "dt": "Task",
+    "fieldname": "custom_longitude",
+    "label": "Longitude",
+    "fieldtype": "Float",
+    "insert_after": "custom_latitude",
+    "module": "Fatehhr",
+    "precision": "8"
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Task-custom_geofence_radius_m",
+    "dt": "Task",
+    "fieldname": "custom_geofence_radius_m",
+    "label": "Geofence Radius (m)",
+    "fieldtype": "Int",
+    "insert_after": "custom_longitude",
+    "module": "Fatehhr"
+  }
+]

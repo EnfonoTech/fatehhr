@@ -5,6 +5,20 @@ app_description = "Field-team HR PWA on top of Frappe HRMS"
 app_email = "dev@enfonotech.com"
 app_license = "mit"
 
+# After-migrate hook — installs Capacitor CORS origins (frappe-vue-pwa §3.6)
+after_migrate = ["fatehhr.install.ensure_capacitor_cors"]
+
+# Fixtures exported as part of the app — custom fields on existing DocTypes
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			["dt", "in", ["Employee", "Employee Checkin", "Task"]],
+			["module", "=", "Fatehhr"],
+		],
+	},
+]
+
 # Apps
 # ------------------
 
