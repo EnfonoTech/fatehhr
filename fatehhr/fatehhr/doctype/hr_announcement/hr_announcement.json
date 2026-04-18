@@ -1,0 +1,36 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:ANN-{YYYY}-{#####}",
+ "creation": "2026-04-18 12:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["title", "pinned", "published_on", "body", "published_by"],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "in_global_search": 1, "in_list_view": 1, "label": "Title", "reqd": 1},
+  {"default": "0", "fieldname": "pinned", "fieldtype": "Check", "in_list_view": 1, "label": "Pinned"},
+  {"default": "Now", "fieldname": "published_on", "fieldtype": "Datetime", "in_list_view": 1, "label": "Published On", "reqd": 1},
+  {"fieldname": "body", "fieldtype": "Long Text", "label": "Body (Markdown)", "reqd": 1},
+  {"fieldname": "published_by", "fieldtype": "Link", "label": "Published By", "options": "User", "read_only": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-04-18 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Fatehhr",
+ "name": "HR Announcement",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "HR Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "export": 1, "report": 1, "share": 1, "email": 1, "print": 1},
+  {"role": "HR User", "read": 1, "write": 1, "create": 1, "export": 1, "report": 1, "share": 1, "email": 1, "print": 1},
+  {"role": "Employee", "read": 1, "report": 1}
+ ],
+ "sort_field": "published_on",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

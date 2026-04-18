@@ -17,6 +17,13 @@ const routes: RouteRecordRaw[] = [
       { path: "expense", name: "expense", component: () => import("@/views/ExpenseClaimView.vue") },
       { path: "expense/mine", name: "expense.list", component: () => import("@/views/ExpenseListView.vue") },
       { path: "sync-errors", name: "sync.errors", component: () => import("@/views/SyncErrorsView.vue") },
+      { path: "tasks", name: "tasks", component: () => import("@/views/TaskListView.vue") },
+      { path: "payslip", name: "payslip", component: () => import("@/views/PayslipListView.vue") },
+      { path: "payslip/:name", name: "payslip.detail", component: () => import("@/views/PayslipDetailView.vue") },
+      { path: "announcements", name: "announce", component: () => import("@/views/AnnouncementListView.vue") },
+      { path: "announcements/:name", name: "announce.detail", component: () => import("@/views/AnnouncementDetailView.vue") },
+      { path: "notifications", name: "notifications", component: () => import("@/views/NotificationView.vue") },
+      { path: "profile", name: "profile", component: () => import("@/views/ProfileView.vue") },
     ],
   },
 ];

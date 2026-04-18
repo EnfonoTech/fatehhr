@@ -22,7 +22,50 @@
     "greeting_morning": "Good morning, {name}",
     "greeting_afternoon": "Good afternoon, {name}",
     "greeting_evening": "Good evening, {name}",
-    "stub": "Phase 1–2 shipped. Full dashboard ships in Phase 4."
+    "currently_in": "You're checked in.",
+    "currently_out": "You're not checked in.",
+    "leave_balance": "Leave balance",
+    "unread": "unread",
+    "latest_announcement": "Latest announcement"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "start": "Start Timer",
+    "stop": "Stop Timer",
+    "empty": "No tasks assigned."
+  },
+  "payslip": {
+    "title": "Payslips",
+    "detail": "Payslip",
+    "earnings": "Earnings",
+    "deductions": "Deductions",
+    "download": "Download PDF",
+    "share": "Share",
+    "empty": "No payslips yet."
+  },
+  "announce": {
+    "title": "Announcements",
+    "detail": "Announcement",
+    "empty": "No announcements yet."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "You're all caught up."
+  },
+  "profile": {
+    "title": "Profile",
+    "emergency": "Emergency contact",
+    "emergency_contact": "Contact name",
+    "relation": "Relation",
+    "phone": "Phone number",
+    "bank": "Bank details",
+    "show": "Show",
+    "hide": "Hide",
+    "bank_name": "Bank",
+    "bank_ac": "Account #",
+    "save": "Save changes",
+    "saved": "Saved.",
+    "queued": "Queued — will save when online."
   },
   "nav": {
     "home": "Home",

@@ -10,6 +10,8 @@ import { NATIVE_VERSION } from "@/app/native-version";
 import "@/offline/processors/checkin";
 import "@/offline/processors/leave";
 import "@/offline/processors/expense";
+import "@/offline/processors/task-timer";
+import "@/offline/processors/profile";
 import "@/styles/tokens.css";
 import "@/styles/base.css";
 
