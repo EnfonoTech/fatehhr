@@ -146,8 +146,12 @@ def _derive_status(d, attendance_row, pairs, leave_rows, holidays):
 
 
 def _holidays_for_employee(employee, start, end):
-	holiday_list = frappe.db.get_value("Employee", employee, "holiday_list") or \
-		frappe.db.get_single_value("HR Settings", "default_holiday_list")
+	holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+	if not holiday_list:
+		try:
+			holiday_list = frappe.db.get_single_value("HR Settings", "default_holiday_list")
+		except Exception:
+			holiday_list = None
 	if not holiday_list:
 		return set()
 	rows = frappe.get_all(
