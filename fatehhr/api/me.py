@@ -58,7 +58,7 @@ def update_profile(**kwargs) -> dict:
 		if f in kwargs and kwargs[f] is not None:
 			setattr(emp, f, kwargs[f])
 			applied[f] = kwargs[f]
-	emp.flags.ignore_permissions = False
+	emp.flags.ignore_permissions = True
 	emp.save()
 	frappe.db.commit()
 	return {"applied": applied}

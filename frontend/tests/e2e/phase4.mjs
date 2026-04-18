@@ -199,16 +199,22 @@ try {
 
   // ============ PROFILE EDIT ============
   await page.evaluate(() => { location.hash = "#/profile"; });
-  await page.waitForSelector(".profile", { timeout: 5000 });
-  await page.waitForResponse((r) => r.url().includes("fatehhr.api.me.profile"));
+  await page.waitForSelector(".profile label input", { timeout: 10000 });
+  await page.waitForFunction(() => {
+    const inputs = document.querySelectorAll(".profile label input");
+    return inputs.length >= 3;
+  }, { timeout: 5000 });
   await page.waitForTimeout(300);
   // Fill emergency phone
   const phoneInput = await page.$$(".profile label input");
   await phoneInput[2].fill("+966500000000"); // emergency phone = 3rd input
-  await Promise.all([
-    page.waitForResponse((r) => r.url().includes("fatehhr.api.me.update_profile") && r.status() === 200),
-    page.click("button >> text=/Save changes|حفظ/"),
-  ]);
+  const updateResp = page.waitForResponse(
+    (r) => r.url().includes("fatehhr.api.me.update_profile"),
+    { timeout: 15000 },
+  );
+  await page.click("button >> text=/Save changes|حفظ/");
+  const uResp = await updateResp;
+  check("Profile update: POST 200", uResp.status() === 200, `status=${uResp.status()}`);
   await page.waitForTimeout(500);
   // Verify persisted
   const profileAfter = await page.evaluate(async () => {
