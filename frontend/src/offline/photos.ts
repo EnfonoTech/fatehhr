@@ -40,7 +40,7 @@ export async function uploadPhoto(photoId: string): Promise<string> {
   form.append("file", row.blob, `${photoId.replace(":", "-")}.jpg`);
   form.append("is_private", "0");
 
-  const headers: Record<string, string> = { "X-Frappe-Site-Name": "fatehhr_dev" };
+  const headers: Record<string, string> = {};
   if (session.apiKey && session.apiSecret) {
     headers["Authorization"] = `token ${session.apiKey}:${session.apiSecret}`;
   }

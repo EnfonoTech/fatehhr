@@ -24,7 +24,6 @@ export async function apiCall<T = unknown>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
-    "X-Frappe-Site-Name": "fatehhr_dev",
   };
   if (session.apiKey && session.apiSecret) {
     headers["Authorization"] = `token ${session.apiKey}:${session.apiSecret}`;

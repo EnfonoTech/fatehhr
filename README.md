@@ -14,8 +14,8 @@ with a hardened sync engine.
 ## Phase 1 + 2 status (2026-04-18)
 
 ✅ Backend
-- `fatehhr` Frappe app installed on a fresh `fatehhr_dev` site at GS DEV
-  (`94.136.186.151`) with `erpnext` + `hrms`.
+- `fatehhr` Frappe app installed on the `hr_demo` site at AQRAR
+  (**https://hr-demo.enfonoerp.com**) alongside `erpnext` + `hrms`.
 - Custom fields applied (Employee PIN hash + api_secret, Employee Checkin
   GPS + task + selfie + geofence status, Task geofence coords + radius).
 - Whitelisted API endpoints:
@@ -78,9 +78,8 @@ Plans for each at `docs/superpowers/plans/`.
    pnpm dev
    ```
 
-   Vite proxies `/api`, `/assets`, `/files` → `http://94.136.186.151`
-   with `Host: fatehhr_dev`, so the SPA hits the Frappe backend on
-   GS DEV directly.
+   Vite proxies `/api`, `/assets`, `/files` → `https://hr-demo.enfonoerp.com`.
+   The public domain has real SSL, so no Host-header gymnastics needed.
 
 3. Open http://localhost:5173/fatehhr/
 
@@ -126,32 +125,40 @@ Manually navigate to http://localhost:5173/fatehhr/checkin (BottomNav
 - [ ] Selfie mode: `CUSTOMER_SELFIE_MODE=every` in `.env` → PhotoSlot
       required before Check In submits.
 
-### curl sanity checks (uses the seeded demo token)
+### curl sanity checks
 
 ```bash
-# After logging in once to get api_key:api_secret pair
+# Login to get api_key:api_secret
+curl -X POST https://hr-demo.enfonoerp.com/api/method/fatehhr.api.auth.login \
+  -H "Content-Type: application/json" \
+  -d '{"usr":"demo@fatehhr.test","pwd":"demo@123"}'
+
+# With the returned token:
 AUTH="token <api_key>:<api_secret>"
 
-# List my check-ins
-curl -H "Host: fatehhr_dev" -H "Authorization: $AUTH" \
-  http://94.136.186.151/api/method/fatehhr.api.checkin.list_mine
+# Profile
+curl -H "Authorization: $AUTH" \
+  https://hr-demo.enfonoerp.com/api/method/fatehhr.api.me.profile
 
-# Check in with task + GPS (expect custom_geofence_status: "inside"
-# because task TASK-2026-00001 has radius 100m at these coords)
-curl -X POST -H "Host: fatehhr_dev" -H "Authorization: $AUTH" \
+# List my check-ins
+curl -X POST -H "Authorization: $AUTH" \
+  -H "Content-Type: application/json" -d '{}' \
+  https://hr-demo.enfonoerp.com/api/method/fatehhr.api.checkin.list_mine
+
+# Check in with GPS
+curl -X POST -H "Authorization: $AUTH" \
   -H "Content-Type: application/json" \
-  -d '{"log_type":"IN","latitude":24.7136,"longitude":46.6753,"task":"TASK-2026-00001","timestamp":null}' \
-  http://94.136.186.151/api/method/fatehhr.api.checkin.create
+  -d '{"log_type":"IN","latitude":24.7136,"longitude":46.6753,"task":null,"timestamp":null}' \
+  https://hr-demo.enfonoerp.com/api/method/fatehhr.api.checkin.create
 ```
 
 ## Server quick reference
 
-- Server: GS DEV (ID `8d69b825-6148-4da6-817b-d079a37f422d`) at
-  `94.136.186.151`
-- Site: `fatehhr_dev`
+- Server: **AQRAR** (ID `3beb2d91-86d1-4d2d-ba0b-30955992455c`) at `185.193.19.184`
+- Site: `hr_demo`
+- Public domain: **https://hr-demo.enfonoerp.com**
+- Admin Desk: https://hr-demo.enfonoerp.com/app
 - Bench path: `/home/v15/frappe-bench` (user `v15`)
-- DB root password: `abc@123` (bench `common_site_config.json`)
-- Admin password: `admin@123`
 - Deploys from: `develop` branch of this repo
 - Control server: `207.180.209.80` (Server Manager API on port 3847)
 

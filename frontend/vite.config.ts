@@ -16,35 +16,19 @@ export default defineConfig(({ mode }) => {
       host: true,
       proxy: {
         "/api": {
-          target: env.CUSTOMER_DEV_PROXY || "http://94.136.186.151",
-          changeOrigin: false,
-          secure: false,
-          configure(proxy) {
-            proxy.on("proxyReq", (proxyReq) => {
-              proxyReq.setHeader("Host", "fatehhr_dev");
-              proxyReq.setHeader("X-Frappe-Site-Name", "fatehhr_dev");
-            });
-          },
+          target: env.CUSTOMER_DEV_PROXY || "https://hr-demo.enfonoerp.com",
+          changeOrigin: true,
+          secure: true,
         },
         "/assets": {
-          target: env.CUSTOMER_DEV_PROXY || "http://94.136.186.151",
-          changeOrigin: false,
-          secure: false,
-          configure(proxy) {
-            proxy.on("proxyReq", (proxyReq) => {
-              proxyReq.setHeader("Host", "fatehhr_dev");
-            });
-          },
+          target: env.CUSTOMER_DEV_PROXY || "https://hr-demo.enfonoerp.com",
+          changeOrigin: true,
+          secure: true,
         },
         "/files": {
-          target: env.CUSTOMER_DEV_PROXY || "http://94.136.186.151",
-          changeOrigin: false,
-          secure: false,
-          configure(proxy) {
-            proxy.on("proxyReq", (proxyReq) => {
-              proxyReq.setHeader("Host", "fatehhr_dev");
-            });
-          },
+          target: env.CUSTOMER_DEV_PROXY || "https://hr-demo.enfonoerp.com",
+          changeOrigin: true,
+          secure: true,
         },
       },
     },
