@@ -14,7 +14,9 @@
     "setup_hint": "4 to 6 digits you'll use to open the app.",
     "wrong": "Wrong PIN. Try again.",
     "locked": "Too many wrong attempts. Please sign in with your password.",
-    "forgot": "Forgot PIN"
+    "forgot": "Forgot PIN",
+    "save": "Save PIN",
+    "unlock": "Unlock"
   },
   "dashboard": {
     "greeting_morning": "Good morning, {name}",

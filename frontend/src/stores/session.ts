@@ -60,6 +60,10 @@ export const useSessionStore = defineStore("session", {
       this.isPinVerified = true;
       this.lastActivityAt = Date.now();
     },
+    async markPinSet() {
+      this.requirePinSetup = false;
+      await secureSet(KEY_PIN_PRESENT, "1");
+    },
     async clear() {
       this.user = null;
       this.apiKey = null;

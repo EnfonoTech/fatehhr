@@ -16,6 +16,7 @@ const busy = ref(false);
 const mode = computed(() => (session.requirePinSetup ? "setup" : "verify"));
 const MAX = 6;
 const MIN = 4;
+const visibleDots = computed(() => Math.max(MIN, Math.min(MAX, pin.value.length + (pin.value.length >= MIN ? 1 : 0))));
 
 function press(n: string) {
   if (pin.value.length < MAX) pin.value += n;
@@ -32,7 +33,7 @@ async function submit() {
     if (mode.value === "setup") {
       await authApi.setPin(pin.value);
       await session.cachePinHash(pin.value);
-      session.requirePinSetup = false;
+      await session.markPinSet();
       session.markPinVerified();
       router.replace({ name: "dashboard" });
       return;
@@ -84,12 +85,13 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
     <p v-if="mode === 'setup'" class="pin__hint">{{ t("pin.setup_hint") }}</p>
     <div class="pin__dots">
       <span
-        v-for="i in MAX"
+        v-for="i in visibleDots"
         :key="i"
         class="pin__dot"
         :class="{ 'is-filled': i <= pin.length }"
       />
     </div>
+    <p class="pin__count">{{ pin.length }} / 4–6</p>
     <p v-if="error" class="pin__error">{{ error }}</p>
 
     <div class="keypad">
@@ -106,7 +108,7 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
 
     <div class="pin__submit" v-if="pin.length >= MIN">
       <button class="pin__submit-btn" :disabled="busy" @click="submit">
-        {{ mode === 'setup' ? '✓' : '→' }}
+        <span>{{ mode === 'setup' ? t('pin.save') : t('pin.unlock') }}</span>
       </button>
     </div>
   </main>
@@ -127,6 +129,7 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
   transition: background var(--m-micro);
 }
 .pin__dot.is-filled { background: var(--accent); box-shadow: none; }
+.pin__count { text-align: center; color: var(--ink-tertiary); font-size: 12px; margin: -12px 0 8px; font-variant-numeric: tabular-nums; }
 .pin__error { color: var(--danger); text-align: center; font-size: 13px; }
 .keypad {
   display: grid; grid-template-columns: repeat(3, 1fr);
@@ -139,11 +142,11 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
 }
 .keypad__key--ghost { box-shadow: none; background: transparent; font-size: 16px; }
 .keypad__key:active { background: var(--bg-sunk); transform: scale(.96); }
-.pin__submit { position: fixed; bottom: 24px; right: 24px; }
+.pin__submit { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: var(--page-gutter); right: var(--page-gutter); }
 .pin__submit-btn {
-  width: 56px; height: 56px; border-radius: var(--r-full);
+  width: 100%; height: 56px; border-radius: var(--r-full);
   background: var(--accent); color: var(--accent-ink); box-shadow: var(--e-2);
-  font-size: 24px;
+  font-size: 16px; font-weight: 600; letter-spacing: 0.02em;
 }
-[dir="rtl"] .pin__submit { left: 24px; right: auto; }
+.pin__submit-btn:active { transform: translateY(1px); }
 </style>
