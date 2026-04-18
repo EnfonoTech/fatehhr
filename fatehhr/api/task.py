@@ -64,15 +64,37 @@ def start_timer(
 	checkin.flags.ignore_permissions = True
 	checkin.insert()
 
-	ts_doc = _get_or_create_open_timesheet(employee)
-	ts_doc.append("time_logs", {
-		"activity_type": _default_activity_type(),
-		"task": task,
-		"from_time": ts,
-		"hours": 0,
-	})
-	ts_doc.flags.ignore_permissions = True
-	ts_doc.save()
+	from frappe.utils import today
+	activity_type = _default_activity_type()
+	existing_ts = frappe.db.get_value(
+		"Timesheet",
+		{"employee": employee, "start_date": today(), "docstatus": 0},
+		"name",
+	)
+	if existing_ts:
+		ts_doc = frappe.get_doc("Timesheet", existing_ts)
+		ts_doc.append("time_logs", {
+			"activity_type": activity_type,
+			"task": task,
+			"from_time": ts,
+			"hours": 0.0001,
+		})
+		ts_doc.flags.ignore_permissions = True
+		ts_doc.save()
+	else:
+		ts_doc = frappe.get_doc({
+			"doctype": "Timesheet",
+			"employee": employee,
+			"start_date": today(),
+			"time_logs": [{
+				"activity_type": activity_type,
+				"task": task,
+				"from_time": ts,
+				"hours": 0.0001,
+			}],
+		})
+		ts_doc.flags.ignore_permissions = True
+		ts_doc.insert()
 	frappe.db.commit()
 
 	return {
