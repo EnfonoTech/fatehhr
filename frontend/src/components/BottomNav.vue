@@ -4,10 +4,10 @@ import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 const tabs = [
   { to: "/", key: "nav.home", icon: "◉" },
-  { to: "/checkin", key: "nav.attendance", icon: "◎" },
+  { to: "/attendance", key: "nav.attendance", icon: "◎" },
   { to: "/leave", key: "nav.leave", icon: "◈" },
-  { to: "/tasks", key: "nav.tasks", icon: "◆" },
-  { to: "/settings", key: "nav.more", icon: "⋯" },
+  { to: "/expense", key: "nav.expense", icon: "₪" },
+  { to: "/sync-errors", key: "nav.more", icon: "⋯" },
 ];
 </script>
 

@@ -56,5 +56,65 @@
       "unknown": "Location unavailable",
       "disabled": "No task radius set"
     }
+  },
+  "attendance": {
+    "title": "Attendance",
+    "status": "Status",
+    "hours": "Hours",
+    "present": "Present",
+    "absent": "Absent",
+    "on_leave": "On leave",
+    "no_task": "No task",
+    "no_pairs": "Nothing recorded for this day.",
+    "autoclosed": "auto-closed at midnight"
+  },
+  "leave": {
+    "title": "Leave",
+    "apply": "Apply",
+    "mine": "My Leaves",
+    "type": "Leave Type",
+    "days_left": "days left",
+    "half_day": "Half day",
+    "reason": "Reason",
+    "balance_card": "Balance",
+    "submit": "Submit",
+    "submitted": "Submitted.",
+    "queued": "Queued — will submit when online.",
+    "cancel": "Cancel",
+    "cancel_confirm": "Cancel this pending leave?",
+    "pending_sync": "Pending sync",
+    "empty": "No leave applications yet."
+  },
+  "expense": {
+    "title": "Expense Claim",
+    "mine": "My Claims",
+    "type": "Type",
+    "date": "Date",
+    "amount": "Amount",
+    "description": "Description",
+    "receipt": "Receipt",
+    "add_line": "Add another line",
+    "remove_line": "Remove line",
+    "total": "Total",
+    "submit": "Submit",
+    "submitted": "Submitted.",
+    "queued": "Queued — will submit when online.",
+    "receipt_required": "Every line needs a receipt photo.",
+    "empty": "No claims yet."
+  },
+  "sync_errors": {
+    "title": "Sync Errors",
+    "empty": "No sync errors.",
+    "retry": "Retry",
+    "delete_one": "Delete",
+    "type_delete": "Type DELETE to confirm."
+  },
+  "nav": {
+    "home": "Home",
+    "attendance": "Attendance",
+    "leave": "Leave",
+    "tasks": "Tasks",
+    "expense": "Expense",
+    "more": "More"
   }
 }

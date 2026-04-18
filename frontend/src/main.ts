@@ -8,6 +8,8 @@ import { useSyncStore } from "@/stores/sync";
 import { utilApi } from "@/api/util";
 import { NATIVE_VERSION } from "@/app/native-version";
 import "@/offline/processors/checkin";
+import "@/offline/processors/leave";
+import "@/offline/processors/expense";
 import "@/styles/tokens.css";
 import "@/styles/base.css";
 

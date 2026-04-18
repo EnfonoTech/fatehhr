@@ -11,6 +11,12 @@ const routes: RouteRecordRaw[] = [
       { path: "", name: "dashboard", component: () => import("@/views/DashboardView.vue") },
       { path: "checkin", name: "checkin", component: () => import("@/views/CheckinView.vue") },
       { path: "checkin/history", name: "checkin.history", component: () => import("@/views/CheckinHistoryView.vue") },
+      { path: "attendance", name: "attendance", component: () => import("@/views/AttendanceCalendarView.vue") },
+      { path: "leave", name: "leave", component: () => import("@/views/LeaveApplyView.vue") },
+      { path: "leave/mine", name: "leave.list", component: () => import("@/views/LeaveListView.vue") },
+      { path: "expense", name: "expense", component: () => import("@/views/ExpenseClaimView.vue") },
+      { path: "expense/mine", name: "expense.list", component: () => import("@/views/ExpenseListView.vue") },
+      { path: "sync-errors", name: "sync.errors", component: () => import("@/views/SyncErrorsView.vue") },
     ],
   },
 ];
