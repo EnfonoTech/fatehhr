@@ -10,13 +10,17 @@
 //
 // Output: android-capacitor/android/app/src/main/res/mipmap-*/ + drawable/splash.png
 
-import sharp from "sharp";
+import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+
+// sharp is installed in android-capacitor/node_modules — resolve from there
+const require = createRequire(path.join(repoRoot, "android-capacitor/package.json"));
+const sharp = require("sharp");
 const resDir = path.join(repoRoot, "android-capacitor", "android", "app", "src", "main", "res");
 
 const accent = (process.env.CUSTOMER_PRIMARY_COLOR || "#2E5D5A").toUpperCase();
@@ -106,16 +110,16 @@ async function writeSplash() {
     .toFile(path.join(drawableDir, "splash.png"));
 }
 
-async function writeColors() {
+async function writeIcLauncherBackground() {
+  // Overwrite Capacitor's generated values/ic_launcher_background.xml
+  // so the adaptive icon uses the customer accent. colorPrimary is wired
+  // via `resValue` in build.gradle, no separate colors_customer.xml needed.
   const valuesDir = path.join(resDir, "values");
   await ensureDir(valuesDir);
   await fs.writeFile(
-    path.join(valuesDir, "colors_customer.xml"),
+    path.join(valuesDir, "ic_launcher_background.xml"),
     `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="colorPrimary">${accent}</color>
-  <color name="colorPrimaryDark">${accent}</color>
-  <color name="colorAccent">${accent}</color>
   <color name="ic_launcher_background">${accent}</color>
 </resources>
 `,
@@ -127,7 +131,9 @@ async function main() {
     await writeAdaptiveIcon(path.join(resDir, dir), size);
   }
   await writeSplash();
-  await writeColors();
+  await writeIcLauncherBackground();
+  // Remove stale file from a previous version of this script if present
+  try { await fs.unlink(path.join(resDir, "values", "colors_customer.xml")); } catch { /* ok */ }
   console.log(`✅ Assets generated for accent ${accent} (ink ${ink})`);
 }
 

@@ -12,13 +12,17 @@
   },
   "dependencies": {
     "@capacitor/android": "^6.1.0",
-    "@capacitor/core": "^6.1.0",
-    "@capacitor/cli": "^6.1.0",
     "@capacitor/camera": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
     "@capacitor/filesystem": "^6.0.0",
     "@capacitor/geolocation": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/network": "^6.0.0",
-    "@capacitor/preferences": "^6.0.0"
+    "@capacitor/preferences": "^6.0.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }

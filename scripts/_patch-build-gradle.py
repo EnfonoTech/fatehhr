@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Patch android/app/build.gradle so values come from env vars at build time."""
+"""Patch android/app/build.gradle so per-customer values come from env vars.
+
+- defaultConfig is fully REPLACED (so Capacitor's hard-coded applicationId/
+  versionCode/versionName below don't override our env lookups).
+- signingConfigs.release: keystore from env, PKCS12-compatible.
+- buildTypes.release: wires in the signingConfig.
+
+Idempotent — running twice is safe.
+"""
 import re
 import sys
 
@@ -14,65 +22,57 @@ if "FATEHHR_KEYSTORE_PATH" in src:
     print("already patched")
     sys.exit(0)
 
-# Inside `defaultConfig { ... }`, override applicationId + add resValues
-default_config_injection = '''        applicationId System.getenv("APP_ID_ANDROID") ?: applicationId
-        versionCode Integer.parseInt(System.getenv("NATIVE_VERSION_CODE") ?: "${versionCode}")
-        versionName System.getenv("NATIVE_VERSION") ?: versionName
+# ---- 1) Replace the whole defaultConfig { ... } block ----
+new_default = """    defaultConfig {
+        applicationId System.getenv("APP_ID_ANDROID") ?: "com.enfono.fatehhr"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode Integer.parseInt(System.getenv("NATIVE_VERSION_CODE") ?: "1")
+        versionName System.getenv("NATIVE_VERSION") ?: "1.0"
         resValue "string", "app_name", (System.getenv("CUSTOMER_BRAND_NAME") ?: "Fateh HR")
         resValue "color", "colorPrimary", (System.getenv("CUSTOMER_PRIMARY_COLOR") ?: "#2E5D5A")
-'''
-
-src = re.sub(
-    r'(defaultConfig\s*\{)',
-    r'\1\n' + default_config_injection,
-    src,
-    count=1,
-)
-
-# Add signingConfigs + release buildType signing before the closing `}` of `android { ... }`
-signing_block = '''
-    signingConfigs {
-        release {
-            def ksPath = System.getenv("FATEHHR_KEYSTORE_PATH") ?: "../../keystore/fatehhr-release.keystore"
-            storeFile file(ksPath)
-            storePassword System.getenv("FATEHHR_KEYSTORE_PW")
-            keyAlias "fatehhr"
-            keyPassword System.getenv("FATEHHR_KEY_PW")
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
-    }
+    }"""
 
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            minifyEnabled false
-            proguardFiles getDefaultProguardFiles('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-'''
-
-# Find the last closing brace of the top-level android {} block
-# Strategy: find "android {" then find matching close
-depth = 0
-i = src.find("android {")
-if i < 0:
-    print("Could not find 'android {' block", file=sys.stderr)
+start = src.find("    defaultConfig {")
+if start < 0:
+    print("Could not find `defaultConfig {` block", file=sys.stderr)
     sys.exit(1)
-start = src.find("{", i)
-j = start
-depth = 1
+brace = src.find("{", start)
+depth, j = 1, brace
 while j < len(src) - 1 and depth > 0:
     j += 1
     if src[j] == "{":
         depth += 1
     elif src[j] == "}":
         depth -= 1
+src = src[:start] + new_default + src[j + 1:]
 
-if depth != 0:
-    print("Could not find matching close brace for 'android {'", file=sys.stderr)
-    sys.exit(1)
+# ---- 2) Inject signingConfigs before existing buildTypes ----
+signing_block = """    signingConfigs {
+        release {
+            def ksPath = System.getenv("FATEHHR_KEYSTORE_PATH") ?: "../../keystore/fatehhr-release.keystore"
+            storeFile file(ksPath)
+            def pw = System.getenv("FATEHHR_KEYSTORE_PW")
+            storePassword pw
+            keyAlias "fatehhr"
+            keyPassword pw
+        }
+    }
 
-# Insert signing_block right before that closing }
-src = src[:j] + signing_block + src[j:]
+"""
+src = re.sub(r"(    buildTypes\s*\{)", signing_block + r"\1", src, count=1)
+
+# ---- 3) Wire signingConfig into buildTypes.release ----
+src = re.sub(
+    r"(buildTypes\s*\{\s*release\s*\{)",
+    r"\1\n            signingConfig signingConfigs.release",
+    src,
+    count=1,
+)
 
 open(path, "w").write(src)
 print(f"patched {path}")
