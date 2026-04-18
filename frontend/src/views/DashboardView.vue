@@ -93,7 +93,6 @@ onMounted(async () => {
       <h3>{{ ann.feed[0].title }}</h3>
     </article>
 
-    <RouterLink to="/profile" class="dash__profile-link">{{ t('profile.title') }} →</RouterLink>
     <VersionBadge />
 
     <BottomNav />
@@ -101,19 +100,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.dash { padding: 0 var(--page-gutter) 120px; display: flex; flex-direction: column; gap: 16px; }
+.dash { padding: 0 var(--page-gutter) 120px; display: flex; flex-direction: column; gap: 12px; }
 .dash__head {
-  display: flex; align-items: center; justify-content: space-between; padding: 12px 0 0;
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 0 0;
 }
 .dash__head h1 {
-  font-family: var(--font-display); font-weight: 400; font-size: 22px; margin: 0;
+  font-family: var(--font-display); font-weight: 400; font-size: 18px; margin: 0;
+  color: var(--ink-secondary); letter-spacing: 0.01em;
 }
 .dashboard__greeting {
-  font-family: var(--font-display); font-weight: 400; font-size: 28px;
-  margin: 0; letter-spacing: -0.01em;
+  font-family: var(--font-display); font-weight: 400; font-size: 20px;
+  margin: 0; letter-spacing: -0.01em; line-height: 1.3;
+  color: var(--ink-primary);
 }
 [dir="rtl"] .dashboard__greeting { font-family: var(--font-display-ar); font-weight: 500; }
-.dash__today-status { margin: 0 0 12px; color: var(--ink-secondary); }
+.dash__today-status { margin: 0 0 10px; color: var(--ink-secondary); font-size: 13px; }
 .dash__chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .dash__chip { background: var(--bg-sunk); padding: 6px 12px; border-radius: var(--r-full); font-size: 13px; }
 .dash__chip.is-accent { background: var(--accent-soft); color: var(--accent); }
@@ -126,10 +127,6 @@ onMounted(async () => {
   letter-spacing: .08em; text-transform: uppercase;
 }
 .dash__ann h3 {
-  font-family: var(--font-display); font-weight: 400; font-size: 18px; margin: 4px 0 0;
-}
-.dash__profile-link {
-  display: block; text-align: center; color: var(--ink-secondary);
-  text-decoration: none; font-size: 14px; padding: 8px 0;
+  font-family: var(--font-display); font-weight: 400; font-size: 16px; margin: 4px 0 0;
 }
 </style>

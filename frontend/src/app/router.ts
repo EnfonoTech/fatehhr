@@ -24,6 +24,7 @@ const routes: RouteRecordRaw[] = [
       { path: "announcements/:name", name: "announce.detail", component: () => import("@/views/AnnouncementDetailView.vue") },
       { path: "notifications", name: "notifications", component: () => import("@/views/NotificationView.vue") },
       { path: "profile", name: "profile", component: () => import("@/views/ProfileView.vue") },
+      { path: "more", name: "more", component: () => import("@/views/MoreView.vue") },
     ],
   },
 ];

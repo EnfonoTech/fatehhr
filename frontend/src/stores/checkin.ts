@@ -23,18 +23,18 @@ export const useCheckinStore = defineStore("checkin", {
   }),
   actions: {
     async refreshToday() {
+      // State = "what IN/OUT is the user currently in?" — read the MOST RECENT
+      // checkin regardless of "today" boundaries. Narrow UTC date filters were
+      // racing midnight / timezone differences and flipping the button back to
+      // "Check In" right after a successful check-in.
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const rows = await checkinApi.list({
-          from_date: `${today} 00:00:00`,
-          to_date: `${today} 23:59:59`,
-        });
+        const rows = await checkinApi.list({ page: 1, page_size: 1 });
         const last = rows[0] ?? null;
         this.currentStatus = last?.log_type ?? null;
         this.currentTask = last?.custom_task ?? null;
         this.lastRow = last;
       } catch {
-        /* offline is fine */
+        /* offline — keep whatever is in memory */
       }
     },
 

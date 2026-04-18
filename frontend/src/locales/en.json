@@ -130,7 +130,25 @@
     "cancel": "Cancel",
     "cancel_confirm": "Cancel this pending leave?",
     "pending_sync": "Pending sync",
-    "empty": "No leave applications yet."
+    "empty": "No leave applications yet.",
+    "period": "Period",
+    "days": "Days",
+    "status_label": "Status"
+  },
+  "more": {
+    "title": "More",
+    "contact": "Contact",
+    "email": "Email",
+    "emergency_phone": "Emergency phone",
+    "emergency_contact": "Emergency contact",
+    "relation": "Relation",
+    "bank": "Bank details",
+    "bank_name": "Bank",
+    "bank_ac": "Account #",
+    "language": "Language",
+    "logout": "Log out",
+    "loading": "Loading…",
+    "read_only_hint": "Editing your bank details? Contact HR."
   },
   "expense": {
     "title": "Expense Claim",

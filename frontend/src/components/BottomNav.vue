@@ -7,7 +7,7 @@ const tabs = [
   { to: "/attendance", key: "nav.attendance", icon: "◎" },
   { to: "/leave", key: "nav.leave", icon: "◈" },
   { to: "/expense", key: "nav.expense", icon: "₪" },
-  { to: "/sync-errors", key: "nav.more", icon: "⋯" },
+  { to: "/more", key: "nav.more", icon: "⋯" },
 ];
 </script>
 
