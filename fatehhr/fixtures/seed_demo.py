@@ -46,13 +46,27 @@ DEMO_LEAVE_TYPE = "Casual Leave"
 
 def run():
     _ensure_setup_wizard()
-    _ensure_user_with_employee(DEMO_EMAIL, DEMO_PASSWORD, DEMO_FIRST_NAME, DEMO_LAST_NAME)
-    _ensure_user_with_employee(MANAGER_EMAIL, MANAGER_PASSWORD, "Demo", "Manager")
-    project_name = _ensure_project()
-    _ensure_tasks(project_name)
-    _ensure_leave_allocation(DEMO_EMAIL)
-    _ensure_announcement()
     frappe.db.commit()
+    _ensure_user_with_employee(DEMO_EMAIL, DEMO_PASSWORD, DEMO_FIRST_NAME, DEMO_LAST_NAME)
+    frappe.db.commit()
+    _ensure_user_with_employee(MANAGER_EMAIL, MANAGER_PASSWORD, "Demo", "Manager")
+    frappe.db.commit()
+    project_name = _ensure_project()
+    frappe.db.commit()
+    _ensure_tasks(project_name)
+    frappe.db.commit()
+    try:
+        _ensure_leave_allocation(DEMO_EMAIL)
+        frappe.db.commit()
+    except Exception as e:  # noqa: BLE001
+        print(f"leave allocation skipped: {e!r}")
+        frappe.db.rollback()
+    try:
+        _ensure_announcement()
+        frappe.db.commit()
+    except Exception as e:  # noqa: BLE001
+        print(f"announcement skipped: {e!r}")
+        frappe.db.rollback()
     print(f"Seed complete. Login: {DEMO_EMAIL} / {DEMO_PASSWORD}")
 
 
