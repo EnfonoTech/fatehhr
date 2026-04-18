@@ -4,9 +4,31 @@ import { Preferences } from "@capacitor/preferences";
 import { Geolocation } from "@capacitor/geolocation";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
+import { Network, type ConnectionStatus } from "@capacitor/network";
 
 export function isNativePlatform(): boolean {
   return (Capacitor as unknown as { isNativePlatform?: () => boolean }).isNativePlatform?.() ?? false;
+}
+
+/**
+ * Subscribe to connection-state changes. On native, this fires even when the
+ * webview is backgrounded — so queued check-ins / leave / expense drain as
+ * soon as network returns, without the user opening the app. (Fixes the
+ * "PWA won't sync without opening" limitation of pure-browser builds.)
+ *
+ * Returns an unsubscribe function.
+ */
+export async function onNetworkChange(
+  handler: (status: ConnectionStatus) => void,
+): Promise<() => void> {
+  const listener = await Network.addListener("networkStatusChange", handler);
+  return () => {
+    void listener.remove();
+  };
+}
+
+export async function getNetworkStatus(): Promise<ConnectionStatus> {
+  return await Network.getStatus();
 }
 
 export async function secureSet(key: string, value: string): Promise<void> {

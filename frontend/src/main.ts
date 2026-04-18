@@ -32,6 +32,21 @@ void sync.refresh().then(() => {
   if (sync.isOnline && sync.pending > 0) return sync.triggerDrain();
 });
 
+// Capacitor Network listener: fires even when webview is backgrounded on
+// Android. This is the "background sync" that the pure PWA lacks.
+void (async () => {
+  try {
+    const { onNetworkChange, getNetworkStatus } = await import("@/app/frappe");
+    const status = await getNetworkStatus();
+    sync.setOnline(status.connected);
+    await onNetworkChange((s) => {
+      sync.setOnline(s.connected);
+    });
+  } catch {
+    // Not in a Capacitor context — fall back to window.online/offline in SyncBar.
+  }
+})();
+
 ["pointerdown", "keydown", "touchstart", "focus"].forEach((ev) =>
   window.addEventListener(ev, () => session.bumpActivity(), { passive: true }),
 );
