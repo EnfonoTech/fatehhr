@@ -16,7 +16,7 @@ const busy = ref(false);
 const mode = computed(() => (session.requirePinSetup ? "setup" : "verify"));
 const MAX = 6;
 const MIN = 4;
-const visibleDots = computed(() => Math.max(MIN, Math.min(MAX, pin.value.length + (pin.value.length >= MIN ? 1 : 0))));
+const visibleDots = computed(() => Math.max(MIN, Math.min(MAX, pin.value.length)));
 
 function press(n: string) {
   if (pin.value.length < MAX) pin.value += n;

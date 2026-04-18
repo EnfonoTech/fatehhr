@@ -79,10 +79,12 @@ try {
   const initialDots = await page.$$eval(".pin__dot", (els) => els.length);
   check("PIN setup shows 4 dots by default", initialDots === 4, `dots=${initialDots}`);
 
-  // ---- GATE 4: enter PIN → counter shows 4, big button "Save PIN"
+  // ---- GATE 4: enter PIN → counter shows 4, EXACTLY 4 dots visible (no phantom dots)
   await typePin(page, PIN);
   const counter = (await page.textContent(".pin__count"))?.trim() ?? "";
   check("PIN counter shows '4 / 4–6'", /^4\s*\/\s*4.6$/.test(counter), `counter="${counter}"`);
+  const dotsAfter4 = await page.$$eval(".pin__dot", (els) => els.length);
+  check("At 4 digits: exactly 4 dots visible (no phantom 5th/6th)", dotsAfter4 === 4, `dots=${dotsAfter4}`);
   const saveLabel = await clickSubmit(page);
   check("Submit button on setup is labeled 'Save PIN'", /Save PIN/i.test(saveLabel), `label="${saveLabel}"`);
 
