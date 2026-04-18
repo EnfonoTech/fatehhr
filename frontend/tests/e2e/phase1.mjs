@@ -127,22 +127,42 @@ try {
   await page2.goto(URL, { waitUntil: "networkidle" });
   await waitForAppScreen(page2);
   screen = await currentScreen(page2);
-  check("Reopen → NOT login (keeps session)", screen !== "login", `screen=${screen}`);
-  check("Reopen → PIN VERIFY (not setup)", screen === "pin_verify", `screen=${screen}`);
+  check("Reopen within 2h session → skips PIN, lands on dashboard", screen === "dashboard", `screen=${screen}`);
 
-  // ---- GATE 7: Unlock with PIN → Dashboard
+  // ---- GATE 7: simulate session expiry → reopen → PIN verify screen
+  await page2.evaluate(() => {
+    localStorage.setItem("fatehhr.pin_verified_at", String(Date.now() - 3 * 60 * 60 * 1000));
+    location.reload();
+  });
+  await waitForAppScreen(page2);
+  screen = await currentScreen(page2);
+  check("After 2h expiry → PIN verify screen", screen === "pin_verify", `screen=${screen}`);
+
+  // ---- GATE 8: Unlock with PIN → Dashboard
   await typePin(page2, PIN);
   const unlockLabel = await clickSubmit(page2);
-  check("Submit on reopen is labeled 'Unlock'", /Unlock|فتح/.test(unlockLabel), `label="${unlockLabel}"`);
+  check("Submit on expired-session reopen labeled 'Unlock'", /Unlock|فتح/.test(unlockLabel), `label="${unlockLabel}"`);
   await page2.waitForSelector(".dashboard__greeting", { timeout: 10000 });
   check("Unlock → dashboard", true);
 
-  // ---- GATE 8: wrong PIN is rejected
+  // ---- GATE 9: OFFLINE PIN unlock (regression guard for reported bug)
+  // Expire session, stay offline, correct PIN should unlock via local hash.
   await page2.evaluate(() => {
-    // clear cached local PIN hash so server check is what rejects us
+    localStorage.setItem("fatehhr.pin_verified_at", String(Date.now() - 3 * 60 * 60 * 1000));
+    location.reload();
+  });
+  await waitForAppScreen(page2);
+  await context.setOffline(true);
+  await typePin(page2, PIN);
+  await clickSubmit(page2);
+  await page2.waitForSelector(".dashboard__greeting", { timeout: 5000 });
+  check("Offline PIN unlock via local hash → dashboard", true);
+  await context.setOffline(false);
+
+  // ---- GATE 10: wrong PIN rejected (online, no local hash so server is the verifier)
+  await page2.evaluate(() => {
+    localStorage.setItem("fatehhr.pin_verified_at", String(Date.now() - 3 * 60 * 60 * 1000));
     localStorage.removeItem("fatehhr.pin_hash_local");
-    // force back to PIN screen
-    location.hash = "#/pin";
     location.reload();
   });
   await waitForAppScreen(page2);
