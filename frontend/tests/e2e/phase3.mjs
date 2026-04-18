@@ -107,9 +107,19 @@ try {
   const leaveTypes = await page.$$eval(".leave-apply__select option", (els) => els.length);
   check("Leave types load (balance-aware)", leaveTypes > 0, `options=${leaveTypes}`);
 
-  // Submit a leave online
+  // Use Sick Leave (has allocation of 10 days on FHR-DEMO)
+  await page.selectOption(".leave-apply__select", "Sick Leave");
+  // Online submit, date 1
+  const today = new Date();
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const d1 = fmt(today);
+  const d2 = fmt(new Date(today.getTime() + 86400000));
+  const [fromInput, toInput] = await page.$$("input[type=date]");
+  await fromInput.fill(d1);
+  await toInput.fill(d1);
+
   const baselineLeaves = (await apiGet(page, "fatehhr.api.leave.list_mine") ?? []).length;
-  await page.fill('textarea', "e2e test leave (online)");
+  await page.fill('textarea', "e2e online");
   await Promise.all([
     page.waitForResponse((r) => r.url().includes("fatehhr.api.leave.apply") && r.status() === 200),
     page.click('button[type=submit]'),
@@ -118,11 +128,13 @@ try {
   const afterOnlineLeaves = (await apiGet(page, "fatehhr.api.leave.list_mine") ?? []).length;
   check("Online leave apply: server row created", afterOnlineLeaves === baselineLeaves + 1, `${baselineLeaves} → ${afterOnlineLeaves}`);
 
-  // Submit offline
+  // Offline submit for day 2
   await context.setOffline(true);
   await page.evaluate(() => window.dispatchEvent(new Event("offline")));
   await page.waitForTimeout(300);
-  await page.fill('textarea', "e2e test leave (offline)");
+  await fromInput.fill(d2);
+  await toInput.fill(d2);
+  await page.fill('textarea', "e2e offline");
   await page.click('button[type=submit]');
   await page.waitForTimeout(1000);
   const afterOffQueue = await getIndexedDbCounts(page);
@@ -207,9 +219,17 @@ try {
   const submitResp = await page.evaluate(async () => {
     const k = localStorage.getItem("fatehhr.api_key");
     const s = localStorage.getItem("fatehhr.api_secret");
-    // First upload a tiny fake image
+    // Upload a minimal valid 1x1 PNG
+    const PNG_BYTES = new Uint8Array([
+      0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x00,0x00,0x0d,
+      0x49,0x48,0x44,0x52,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x01,
+      0x08,0x02,0x00,0x00,0x00,0x90,0x77,0x53,0xde,0x00,0x00,0x00,
+      0x0c,0x49,0x44,0x41,0x54,0x08,0x99,0x63,0xf8,0xcf,0x00,0x00,
+      0x00,0x03,0x00,0x01,0x5b,0x1c,0xc6,0xc1,0x00,0x00,0x00,0x00,
+      0x49,0x45,0x4e,0x44,0xae,0x42,0x60,0x82,
+    ]);
     const form = new FormData();
-    form.append("file", new Blob(["fake"], { type: "image/jpeg" }), "e2e.jpg");
+    form.append("file", new Blob([PNG_BYTES], { type: "image/png" }), "e2e.png");
     form.append("is_private", "0");
     const up = await fetch("/api/method/upload_file", {
       method: "POST",
