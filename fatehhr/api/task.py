@@ -43,6 +43,8 @@ def start_timer(
 	"""Open a Timesheet detail AND create a paired Employee Checkin (IN)."""
 	employee = _my_employee()
 	ts = get_datetime(timestamp) if timestamp else now_datetime()
+	if ts.tzinfo is not None:
+		ts = ts.replace(tzinfo=None)
 
 	t_lat, t_lng, t_rad = frappe.db.get_value(
 		"Task", task,
@@ -121,6 +123,8 @@ def stop_timer(
 		frappe.throw(frappe._("Invalid timer session."))
 	row = ts_doc.time_logs[row_idx]
 	end_ts = get_datetime(timestamp) if timestamp else now_datetime()
+	if end_ts.tzinfo is not None:
+		end_ts = end_ts.replace(tzinfo=None)
 	row.to_time = end_ts
 	row.hours = max(0, (end_ts - get_datetime(row.from_time)).total_seconds() / 3600.0)
 	ts_doc.flags.ignore_permissions = True

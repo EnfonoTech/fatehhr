@@ -56,7 +56,11 @@ async function getIndexedDbCounts(page) {
 
 const browser = await chromium.launch({ headless: true });
 try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    geolocation: { latitude: 24.7136, longitude: 46.6753 },
+    permissions: ["geolocation"],
+  });
   const page = await context.newPage();
   const netErrors = [];
   page.on("response", async (r) => {
@@ -65,6 +69,10 @@ try {
       netErrors.push(`${r.status()} ${r.url().split("/api/method/")[1]?.split("?")[0]}: ${t.slice(0, 150)}`);
     }
   });
+  page.on("console", (m) => {
+    if (m.type() === "error") netErrors.push(`[console.error] ${m.text().slice(0, 200)}`);
+  });
+  page.on("pageerror", (e) => netErrors.push(`[pageerror] ${e.message}`));
 
   await loginAndSetPin(page);
   check("Logged in and reached dashboard", true);
@@ -78,10 +86,13 @@ try {
   check("Dashboard shows 4 quick actions", hasQuickActions === 4, `items=${hasQuickActions}`);
 
   // ============ ANNOUNCEMENTS (seeded via seed_demo.run before test) ============
+  const feedResp = page.waitForResponse(
+    (r) => r.url().includes("fatehhr.api.announcement.feed"),
+    { timeout: 10000 },
+  );
   await page.evaluate(() => { location.hash = "#/announcements"; });
-  await page.waitForSelector(".annlist", { timeout: 10000 });
-  await page.waitForResponse((r) => r.url().includes("fatehhr.api.announcement.feed"));
-  await page.waitForTimeout(500);
+  await feedResp;
+  await page.waitForSelector(".annlist__row", { timeout: 5000 });
   const annCount = await page.$$eval(".annlist__row", (els) => els.length);
   check("Announcements feed lists entries", annCount >= 1, `count=${annCount}`);
 
@@ -123,22 +134,29 @@ try {
   const taskCount = await page.$$eval(".tasks__card", (els) => els.length);
   check("Tasks list loads at least 1 assigned task", taskCount >= 1, `tasks=${taskCount}`);
 
-  // Start timer ONLINE
+  // Start timer ONLINE — subscribe to the response BEFORE clicking
   const startBtn = await page.waitForSelector(".tasks__card button >> text=/Start/", { timeout: 3000 });
-  await Promise.all([
-    page.waitForResponse((r) => r.url().includes("fatehhr.api.task.start_timer") && r.status() === 200),
-    startBtn.click(),
-  ]);
+  const startResp = page.waitForResponse(
+    (r) => r.url().includes("fatehhr.api.task.start_timer"),
+    { timeout: 20000 },
+  );
+  await startBtn.click();
+  const sResp = await startResp;
+  const sBody = await sResp.text().catch(() => "");
+  check("Timer start (online): POST 200", sResp.status() === 200, `status=${sResp.status()} body=${sBody.slice(0, 300)}`);
   await page.waitForTimeout(500);
   const running = await page.$(".tasks__card.is-running");
   check("Timer start (online): task card shows running state", !!running);
 
   // Stop timer ONLINE
   const stopBtn = await page.waitForSelector(".tasks__card button >> text=/Stop/", { timeout: 3000 });
-  await Promise.all([
-    page.waitForResponse((r) => r.url().includes("fatehhr.api.task.stop_timer") && r.status() === 200),
-    stopBtn.click(),
-  ]);
+  const stopResp = page.waitForResponse(
+    (r) => r.url().includes("fatehhr.api.task.stop_timer"),
+    { timeout: 20000 },
+  );
+  await stopBtn.click();
+  const spResp = await stopResp;
+  check("Timer stop (online): POST 200", spResp.status() === 200, `status=${spResp.status()}`);
   await page.waitForTimeout(500);
   const stillRunning = await page.$(".tasks__card.is-running");
   check("Timer stop (online): running state cleared", !stillRunning);

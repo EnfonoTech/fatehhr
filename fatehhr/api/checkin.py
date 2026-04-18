@@ -36,6 +36,8 @@ def create(
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
 	ts = get_datetime(timestamp) if timestamp else now_datetime()
+	if ts.tzinfo is not None:
+		ts = ts.replace(tzinfo=None)
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,
