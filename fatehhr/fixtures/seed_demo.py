@@ -242,14 +242,20 @@ def _ensure_leave_allocation(email):
 
 def _ensure_announcement():
     if not frappe.db.table_exists("HR Announcement"):
-        # DocType ships in Phase 4; skip in earlier phases
         return
-    if frappe.db.exists("HR Announcement", {"title": "Welcome to Fateh HR"}):
-        return
-    frappe.get_doc({
-        "doctype": "HR Announcement",
-        "title": "Welcome to Fateh HR",
-        "body": "**This is the demo site.** Check in, apply for leave, start a task timer — it all works offline too.",
-        "pinned": 1,
-        "published_on": frappe.utils.now(),
-    }).insert(ignore_permissions=True)
+    if not frappe.db.exists("HR Announcement", {"title": "Welcome to Fateh HR"}):
+        frappe.get_doc({
+            "doctype": "HR Announcement",
+            "title": "Welcome to Fateh HR",
+            "body": "**Welcome** to _Fateh HR_. Check in, apply for leave, start a task timer — it works offline too.",
+            "pinned": 1,
+            "published_on": frappe.utils.now(),
+        }).insert(ignore_permissions=True)
+    if not frappe.db.exists("HR Announcement", {"title": "Q2 town hall"}):
+        frappe.get_doc({
+            "doctype": "HR Announcement",
+            "title": "Q2 town hall",
+            "body": "Q2 town hall is next **Thursday at 4pm**. See you there.",
+            "pinned": 0,
+            "published_on": frappe.utils.now(),
+        }).insert(ignore_permissions=True)
