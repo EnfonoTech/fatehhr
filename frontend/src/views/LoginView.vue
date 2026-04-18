@@ -13,6 +13,7 @@ import VersionBadge from "@/components/VersionBadge.vue";
 const { t, locale } = useI18n();
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const error = ref<string | null>(null);
 const busy = ref(false);
 const session = useSessionStore();
@@ -46,7 +47,20 @@ async function submit() {
       </label>
       <label>
         <span>{{ t("login.password") }}</span>
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <div class="login__password-wrap">
+          <input
+            v-model="password"
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="current-password"
+            required
+          />
+          <button
+            type="button"
+            class="login__password-toggle"
+            :aria-label="showPassword ? t('login.hide_password') : t('login.show_password')"
+            @click="showPassword = !showPassword"
+          >{{ showPassword ? '🙈' : '👁' }}</button>
+        </div>
       </label>
       <p v-if="error" class="login__error">{{ error }}</p>
       <AppButton block type="submit" :disabled="busy">{{ t("login.continue") }}</AppButton>
@@ -80,6 +94,17 @@ async function submit() {
 .login__form input:focus {
   outline: 2px solid var(--accent-ring); outline-offset: 2px;
 }
+.login__password-wrap { position: relative; display: flex; align-items: center; }
+.login__password-wrap input { flex: 1; padding-right: 44px; }
+[dir="rtl"] .login__password-wrap input { padding-right: 16px; padding-left: 44px; }
+.login__password-toggle {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  color: var(--ink-secondary); font-size: 16px; background: transparent;
+  border: 0; cursor: pointer; border-radius: var(--r-full);
+}
+.login__password-toggle:active { background: var(--bg-surface); }
+[dir="rtl"] .login__password-toggle { left: 8px; right: auto; }
 .login__error { color: var(--danger); margin: -4px 0 0; font-size: 13px; }
 .login__lang { margin-top: 8px; color: var(--ink-secondary); font-size: 13px; }
 </style>

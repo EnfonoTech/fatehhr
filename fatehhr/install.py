@@ -10,30 +10,32 @@ CAPACITOR_ORIGINS = (
 def ensure_capacitor_cors():
 	"""Idempotently append Capacitor origins to site_config.allow_cors.
 
-	frappe-vue-pwa §3.6. Frappe v15 reads CORS allowlist from
-	`frappe.conf.allow_cors` (a comma-separated string or a list) —
-	configured via `site_config.json` / `common_site_config.json`.
-
-	Runs via `after_migrate` hook so every bench migrate on this app
-	keeps CORS in sync. Only writes to the CURRENT site's config.
+	frappe-vue-pwa §3.6. Frappe v15's CORS checker expects a **JSON list**
+	(or the literal "*"). A comma-separated string is silently treated as
+	one opaque origin and never matches — so NO `Access-Control-*` headers
+	get emitted and the Capacitor WebView's fetch throws "Failed to fetch".
+	Writing a list fixes it.
 	"""
-	current = frappe.conf.get("allow_cors") or ""
+	current = frappe.conf.get("allow_cors")
 	if isinstance(current, list):
 		existing = {str(o).strip() for o in current if str(o).strip()}
+	elif isinstance(current, str) and current.strip():
+		# Legacy comma-separated value — migrate to a proper list
+		existing = {o.strip() for o in current.split(",") if o.strip()}
 	else:
-		existing = {o.strip() for o in str(current).split(",") if o.strip()}
+		existing = set()
 
-	missing = [o for o in CAPACITOR_ORIGINS if o not in existing]
-	if not missing:
+	merged = sorted(existing.union(CAPACITOR_ORIGINS))
+
+	# Rewrite if the stored value isn't already a list with the same set.
+	needs_write = not isinstance(current, list) or set(current) != set(merged)
+	if not needs_write:
 		return
 
-	merged = sorted(existing.union(missing))
-	frappe.conf["allow_cors"] = ",".join(merged)
-
-	# Persist to site_config.json
 	from frappe.installer import update_site_config
 	update_site_config(
 		"allow_cors",
-		",".join(merged),
+		merged,
 		site_config_path=frappe.get_site_path("site_config.json"),
 	)
+	frappe.conf["allow_cors"] = merged

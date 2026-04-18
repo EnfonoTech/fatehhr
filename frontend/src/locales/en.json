@@ -6,7 +6,9 @@
     "password": "Password",
     "continue": "Continue",
     "forgot": "Forgot password?",
-    "wrong": "That email or password didn't match."
+    "wrong": "That email or password didn't match.",
+    "show_password": "Show password",
+    "hide_password": "Hide password"
   },
   "pin": {
     "title": "Enter PIN",
