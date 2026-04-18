@@ -34,39 +34,46 @@ async function submit() {
       await authApi.setPin(pin.value);
       await session.cachePinHash(pin.value);
       await session.markPinSet();
-      session.markPinVerified();
+      await session.markPinVerified();
       router.replace({ name: "dashboard" });
       return;
     }
 
-    if (!navigator.onLine) {
-      const ok = await session.verifyPinLocally(pin.value);
-      if (!ok) {
-        error.value = t("pin.wrong");
-        pin.value = "";
-        return;
-      }
-      session.markPinVerified();
+    // --- VERIFY path ---
+    // Try local hash first. Instant, works offline, survives navigator.onLine lies.
+    const localOk = await session.verifyPinLocally(pin.value);
+    if (localOk) {
+      await session.markPinVerified();
       router.replace({ name: "dashboard" });
       return;
     }
 
+    // No local match → try server (first unlock on fresh device, or wrong PIN).
     if (!session.user) {
       router.replace({ name: "login" });
       return;
     }
-    const r = await authApi.verifyPin(session.user, pin.value);
-    await session.applyLogin({ ...r, require_pin_setup: false });
-    await session.cachePinHash(pin.value);
-    session.markPinVerified();
-    router.replace({ name: "dashboard" });
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 423) {
-      error.value = t("pin.locked");
-      await session.clear();
-      router.replace({ name: "login" });
+    try {
+      const r = await authApi.verifyPin(session.user, pin.value);
+      await session.applyLogin({ ...r, require_pin_setup: false });
+      await session.cachePinHash(pin.value);
+      await session.markPinVerified();
+      router.replace({ name: "dashboard" });
       return;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 423) {
+        error.value = t("pin.locked");
+        await session.clear();
+        router.replace({ name: "login" });
+        return;
+      }
+      // 401 = real "wrong PIN" from server. Network error (fetch reject) also
+      // lands here with no ApiError — since local hash didn't match either,
+      // treat both as "wrong PIN, try again".
+      error.value = t("pin.wrong");
+      pin.value = "";
     }
+  } catch {
     error.value = t("pin.wrong");
     pin.value = "";
   } finally {

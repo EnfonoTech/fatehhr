@@ -93,6 +93,8 @@
     "history": "Check-in history",
     "empty_history": "No check-ins yet.",
     "unknown_location": "Finding your location…",
+    "getting_location": "Getting GPS location…",
+    "location_required": "Can't get GPS. Grant location permission, then tap Check In again.",
     "geofence": {
       "inside": "Within task radius",
       "outside": "Outside task radius — will be flagged",

@@ -58,6 +58,28 @@ async function submit() {
     message.value = t("checkin.selfie_required");
     return;
   }
+
+  // Re-fetch coords at tap time if we don't have them yet.
+  // Fixes: GPS permission granted late, or initial fetch failed silently.
+  if (lat.value == null || lng.value == null) {
+    message.value = t("checkin.getting_location");
+    const coords = await getCurrentCoords();
+    if (coords) {
+      lat.value = coords.latitude;
+      lng.value = coords.longitude;
+      try {
+        const g = await utilApi.reverseGeocode(coords.latitude, coords.longitude);
+        address.value = g.address;
+      } catch {
+        /* offline — keep raw coords */
+      }
+    } else {
+      await hapticError();
+      message.value = t("checkin.location_required");
+      return;
+    }
+  }
+
   busy.value = true;
   message.value = null;
   try {

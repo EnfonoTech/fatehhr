@@ -13,6 +13,10 @@ const KEY_API_KEY = "fatehhr.api_key";
 const KEY_API_SECRET = "fatehhr.api_secret";
 const KEY_PIN_PRESENT = "fatehhr.pin_present";
 const KEY_PIN_HASH = "fatehhr.pin_hash_local";
+const KEY_PIN_VERIFIED_AT = "fatehhr.pin_verified_at";
+
+// How long a PIN unlock stays valid. Tap the lock icon in Settings to force re-prompt.
+const PIN_SESSION_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 async function clientHashPin(pin: string, salt: string): Promise<string> {
   const enc = new TextEncoder().encode(`${salt}:${pin}`);
@@ -43,6 +47,12 @@ export const useSessionStore = defineStore("session", {
       this.apiSecret = await secureGet(KEY_API_SECRET);
       const pinPresent = await secureGet(KEY_PIN_PRESENT);
       this.requirePinSetup = pinPresent !== "1";
+      // Restore PIN-verified state if the 2-hour window is still valid.
+      const verifiedAt = Number(await secureGet(KEY_PIN_VERIFIED_AT) ?? "0");
+      if (verifiedAt && Date.now() - verifiedAt < PIN_SESSION_MS) {
+        this.isPinVerified = true;
+        this.lastActivityAt = Date.now();
+      }
       this.hydrated = true;
     },
     async applyLogin(p: LoginPayload) {
@@ -56,9 +66,10 @@ export const useSessionStore = defineStore("session", {
       await secureSet(KEY_API_SECRET, p.api_secret);
       await secureSet(KEY_PIN_PRESENT, p.require_pin_setup ? "0" : "1");
     },
-    markPinVerified() {
+    async markPinVerified() {
       this.isPinVerified = true;
       this.lastActivityAt = Date.now();
+      await secureSet(KEY_PIN_VERIFIED_AT, String(Date.now()));
     },
     async markPinSet() {
       this.requirePinSetup = false;
@@ -75,6 +86,7 @@ export const useSessionStore = defineStore("session", {
       await secureRemove(KEY_API_SECRET);
       await secureRemove(KEY_PIN_PRESENT);
       await secureRemove(KEY_PIN_HASH);
+      await secureRemove(KEY_PIN_VERIFIED_AT);
     },
 
     // Offline PIN (frappe-vue-pwa §5.5) — cache a separate client-side hash
@@ -94,7 +106,7 @@ export const useSessionStore = defineStore("session", {
     },
     shouldReprompt(): boolean {
       if (!this.hasApiSecret) return false;
-      return Date.now() - this.lastActivityAt > 15 * 60 * 1000;
+      return Date.now() - this.lastActivityAt > PIN_SESSION_MS;
     },
   },
 });
