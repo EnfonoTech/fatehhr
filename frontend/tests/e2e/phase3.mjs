@@ -83,9 +83,11 @@ try {
   check("Logged in and reached dashboard", true);
 
   // ============ ATTENDANCE CALENDAR ============
-  await page.evaluate(() => { location.hash = "#/attendance"; });
-  await page.waitForSelector(".cal__grid", { timeout: 10000 });
-  await page.waitForResponse((r) => r.url().includes("fatehhr.api.attendance.month"));
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes("fatehhr.api.attendance.month") && r.status() === 200),
+    page.evaluate(() => { location.hash = "#/attendance"; }),
+  ]);
+  await page.waitForSelector(".cal__cell", { timeout: 10000 });
   const cellCount = await page.$$eval(".cal__cell", (els) => els.length);
   const d = new Date();
   const expectDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();

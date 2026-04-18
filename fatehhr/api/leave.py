@@ -7,10 +7,15 @@ def types_with_balance() -> list[dict]:
 	employee = _my_employee_or_none()
 	if not employee:
 		return []
-	types = frappe.get_all(
-		"Leave Type",
-		fields=["name", "leave_type_name", "max_leaves_allowed", "color"],
-	)
+	type_fields = ["name", "leave_type_name", "max_leaves_allowed"]
+	# Some HRMS versions have a `color` column, others don't. Try with, fall back without.
+	try:
+		types = frappe.get_all("Leave Type", fields=[*type_fields, "color"])
+	except Exception:
+		types = [
+			{**t, "color": None}
+			for t in frappe.get_all("Leave Type", fields=type_fields)
+		]
 	from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 	today = nowdate()
 	out = []
