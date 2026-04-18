@@ -8,6 +8,7 @@ import HeroCard from "@/components/HeroCard.vue";
 import QuickActionGrid from "@/components/QuickActionGrid.vue";
 import NotificationBell from "@/components/NotificationBell.vue";
 import AppButton from "@/components/Button.vue";
+import VersionBadge from "@/components/VersionBadge.vue";
 import { useSessionStore } from "@/stores/session";
 import { useProfileStore } from "@/stores/profile";
 import { useCheckinStore } from "@/stores/checkin";
@@ -93,6 +94,7 @@ onMounted(async () => {
     </article>
 
     <RouterLink to="/profile" class="dash__profile-link">{{ t('profile.title') }} →</RouterLink>
+    <VersionBadge />
 
     <BottomNav />
   </main>

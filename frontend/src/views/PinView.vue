@@ -6,6 +6,7 @@ import { authApi } from "@/api/auth";
 import { ApiError } from "@/api/client";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
+import VersionBadge from "@/components/VersionBadge.vue";
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -118,6 +119,7 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
         <span>{{ mode === 'setup' ? t('pin.save') : t('pin.unlock') }}</span>
       </button>
     </div>
+    <VersionBadge />
   </main>
 </template>
 

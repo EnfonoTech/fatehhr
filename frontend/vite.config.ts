@@ -6,12 +6,25 @@ import { fatehhrThemePlugin } from "./plugins/vite-theme-plugin";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "CUSTOMER_");
-  // Native bundles use relative paths; web builds deploy under Frappe's
-  // /assets/fatehhr/spa/ static route (served from apps/fatehhr/fatehhr/public/spa/).
   const base = env.CUSTOMER_BUILD_TARGET === "native" ? "" : "/assets/fatehhr/spa/";
+
+  // Build-time version tag. Shown in-app so users can confirm they got the
+  // latest JS. Format: YYMMDD-HHMM
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const BUILD_TAG =
+    now.getUTCFullYear().toString().slice(-2) +
+    pad(now.getUTCMonth() + 1) +
+    pad(now.getUTCDate()) +
+    "-" +
+    pad(now.getUTCHours()) +
+    pad(now.getUTCMinutes());
 
   return {
     base,
+    define: {
+      __BUILD_TAG__: JSON.stringify(BUILD_TAG),
+    },
     resolve: { alias: { "@": path.resolve(__dirname, "src") } },
     plugins: [
       vue(),

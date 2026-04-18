@@ -8,6 +8,7 @@ import { setLocale } from "@/app/i18n";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
 import AppButton from "@/components/Button.vue";
+import VersionBadge from "@/components/VersionBadge.vue";
 
 const { t, locale } = useI18n();
 const email = ref("");
@@ -57,6 +58,7 @@ async function submit() {
         {{ locale === "ar" ? "English" : "العربية" }}
       </button>
     </form>
+    <VersionBadge />
   </main>
 </template>
 
