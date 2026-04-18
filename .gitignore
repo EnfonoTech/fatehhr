@@ -4,3 +4,4 @@ frontend/**/*.vue.d.ts
 frontend/src/**/*.js
 frontend/src/**/*.d.ts
 !frontend/src/vite-env.d.ts
+dist/
