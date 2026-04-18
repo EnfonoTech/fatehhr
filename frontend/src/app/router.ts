@@ -1,5 +1,4 @@
-import { createRouter, createWebHistory, createWebHashHistory, type RouteRecordRaw } from "vue-router";
-import { isNative } from "./platform";
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 
 const routes: RouteRecordRaw[] = [
@@ -17,8 +16,13 @@ const routes: RouteRecordRaw[] = [
 ];
 
 export function createAppRouter() {
-  const history = isNative() ? createWebHashHistory() : createWebHistory("/fatehhr/");
-  const router = createRouter({ history, routes });
+  // Hash routing everywhere — survives page refresh on any server without
+  // SPA fallback config, and plays nicely with Capacitor's WebView.
+  // Base uses the full Frappe asset path so links resolve correctly.
+  const router = createRouter({
+    history: createWebHashHistory("/assets/fatehhr/spa/"),
+    routes,
+  });
 
   router.beforeEach(async (to) => {
     const session = useSessionStore();

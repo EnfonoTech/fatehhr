@@ -8,6 +8,11 @@ app_license = "mit"
 # After-migrate hook — installs Capacitor CORS origins (frappe-vue-pwa §3.6)
 after_migrate = ["fatehhr.install.ensure_capacitor_cors"]
 
+# Friendly URL — /fatehhr → SPA entry point
+website_redirects = [
+	{"source": r"/fatehhr/?$", "target": "/assets/fatehhr/spa/index.html", "match_with_query_string": False},
+]
+
 # Fixtures exported as part of the app — custom fields on existing DocTypes
 fixtures = [
 	{

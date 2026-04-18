@@ -5,7 +5,9 @@ import { fatehhrThemePlugin } from "./plugins/vite-theme-plugin";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "CUSTOMER_");
-  const base = env.CUSTOMER_BUILD_TARGET === "native" ? "" : "/fatehhr/";
+  // Native bundles use relative paths; web builds deploy under Frappe's
+  // /assets/fatehhr/spa/ static route (served from apps/fatehhr/fatehhr/public/spa/).
+  const base = env.CUSTOMER_BUILD_TARGET === "native" ? "" : "/assets/fatehhr/spa/";
 
   return {
     base,

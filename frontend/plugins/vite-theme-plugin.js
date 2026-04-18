@@ -38,13 +38,13 @@ export function fatehhrThemePlugin(env) {
             const manifest = {
                 name: brand,
                 short_name: brand.length > 12 ? brand.slice(0, 12) : brand,
-                start_url: "/fatehhr/",
+                start_url: "/assets/fatehhr/spa/index.html",
                 display: "standalone",
                 background_color: "#FAF7F2",
                 theme_color: tokens.accent,
                 icons: [
-                    { src: "/fatehhr/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-                    { src: "/fatehhr/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+                    { src: "/assets/fatehhr/spa/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+                    { src: "/assets/fatehhr/spa/icons/icon-512.png", sizes: "512x512", type: "image/png" },
                 ],
             };
             this.emitFile({
