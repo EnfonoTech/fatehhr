@@ -132,6 +132,7 @@ def _ensure_user_with_employee(email, password, first, last):
         "gender": "Male",
         "date_of_birth": "1990-01-01",
         "date_of_joining": "2024-01-01",
+        "employee_number": f"FHR-{email.split('@')[0].upper()}",
     }
     existing_company = frappe.db.get_value("Company", {}, "name")
     if existing_company:
