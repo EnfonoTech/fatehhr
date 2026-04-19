@@ -69,6 +69,26 @@ async function logout() {
       <p class="more__hint">{{ t('more.read_only_hint') }}</p>
     </Card>
 
+    <!-- Shortcuts -->
+    <Card class="more__section more__links">
+      <button class="more__link-btn" type="button" @click="router.push('/payslip')">
+        <span class="more__link-label">{{ t('payslip.title') }}</span>
+        <span class="more__link-chev" aria-hidden="true">›</span>
+      </button>
+      <button class="more__link-btn" type="button" @click="router.push('/announcements')">
+        <span class="more__link-label">{{ t('announce.title') }}</span>
+        <span class="more__link-chev" aria-hidden="true">›</span>
+      </button>
+      <button class="more__link-btn" type="button" @click="router.push('/notifications')">
+        <span class="more__link-label">{{ t('notifications.title') }}</span>
+        <span class="more__link-chev" aria-hidden="true">›</span>
+      </button>
+      <button class="more__link-btn" type="button" @click="router.push('/sync-errors')">
+        <span class="more__link-label">{{ t('sync_errors.title') }}</span>
+        <span class="more__link-chev" aria-hidden="true">›</span>
+      </button>
+    </Card>
+
     <Card class="more__section">
       <h3>{{ t('more.language') }}</h3>
       <div class="more__lang-row">
@@ -122,4 +142,17 @@ async function logout() {
 .more__hint { margin: 10px 0 0; font-size: 11px; color: var(--ink-tertiary); }
 .more__lang-row { display: flex; gap: 8px; }
 .more__logout { margin-top: 12px; }
+
+.more__links { padding: 0; display: flex; flex-direction: column; }
+.more__link-btn {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px;
+  background: transparent; border: 0; width: 100%;
+  text-align: left; cursor: pointer;
+  font-size: 14px; color: var(--ink-primary);
+}
+.more__link-btn + .more__link-btn { border-top: 1px solid var(--hairline); }
+.more__link-btn:active { background: var(--bg-sunk); }
+.more__link-chev { color: var(--ink-tertiary); font-size: 18px; }
+[dir="rtl"] .more__link-chev { transform: scaleX(-1); }
 </style>

@@ -23,6 +23,17 @@ onMounted(() => store.loadMonth(year.value, month.value));
 const days = computed(() => store.current?.days ?? []);
 const summary = computed(() => store.current?.summary);
 
+/** Cold-start: before store.loadMonth resolves, show skeleton cells so the
+ *  month grid's shape is visible instantly (bug #10 — "blank for 2-3 seconds
+ *  on first open"). We render one cell per day-of-month for the active month. */
+const skeletonCells = computed(() => {
+  if (days.value.length) return [];
+  const y = year.value;
+  const m = month.value;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+});
+
 function prev() {
   if (month.value === 1) { month.value = 12; year.value--; }
   else month.value--;
@@ -72,6 +83,14 @@ const selected = computed(() =>
         @click="tap(d.date)"
       >
         <span class="cal__dow">{{ Number(d.date.slice(-2)) }}</span>
+      </div>
+      <!-- Skeleton cells until the first month response comes in -->
+      <div
+        v-for="n in skeletonCells"
+        :key="`sk-${n}`"
+        class="cal__cell cal__cell--skel"
+      >
+        <span class="cal__dow">{{ n }}</span>
       </div>
     </div>
 
@@ -128,6 +147,14 @@ const selected = computed(() =>
 .cal__cell.is-leave { background: #D8E0EA; color: var(--info); }
 .cal__cell.is-holiday { background: var(--hairline); color: var(--ink-tertiary); }
 .cal__cell.is-weekend { background: var(--bg-sunk); color: var(--ink-tertiary); }
+.cal__cell--skel {
+  animation: cal-pulse 1.2s ease-in-out infinite;
+  color: var(--ink-tertiary);
+}
+@keyframes cal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
 .cal__summary {
   margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 8px; text-align: center;

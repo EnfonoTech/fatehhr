@@ -1,7 +1,24 @@
 import frappe
-from frappe.utils import now_datetime, get_datetime
+from frappe.utils import now_datetime, get_datetime, get_system_timezone
+
+try:
+	from zoneinfo import ZoneInfo
+except ImportError:  # py<3.9 fallback
+	from backports.zoneinfo import ZoneInfo  # type: ignore
 
 from fatehhr.utils.geofence import classify
+
+
+def _to_site_tz(ts):
+	"""Convert a timezone-aware datetime to a naive site-local datetime.
+	Frappe stores datetimes as naive values assumed to be in site timezone.
+	Offline clients ship UTC ISO strings (e.g. "2026-04-19T06:00:00.000Z");
+	without conversion a checkin recorded at 09:00 IST saves as 06:00 and
+	breaks the timeline ordering. Keeps naive inputs unchanged.
+	"""
+	if ts.tzinfo is None:
+		return ts
+	return ts.astimezone(ZoneInfo(get_system_timezone())).replace(tzinfo=None)
 
 
 @frappe.whitelist()
@@ -35,9 +52,7 @@ def create(
 		) or (None, None, None)
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
-	ts = get_datetime(timestamp) if timestamp else now_datetime()
-	if ts.tzinfo is not None:
-		ts = ts.replace(tzinfo=None)
+	ts = _to_site_tz(get_datetime(timestamp)) if timestamp else now_datetime()
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,

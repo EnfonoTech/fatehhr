@@ -12,7 +12,6 @@ import VersionBadge from "@/components/VersionBadge.vue";
 import { useSessionStore } from "@/stores/session";
 import { useProfileStore } from "@/stores/profile";
 import { useCheckinStore } from "@/stores/checkin";
-import { useLeaveStore } from "@/stores/leave";
 import { useAnnouncementStore } from "@/stores/announcement";
 import { useNotificationStore } from "@/stores/notification";
 
@@ -21,7 +20,6 @@ const router = useRouter();
 const session = useSessionStore();
 const profile = useProfileStore();
 const checkin = useCheckinStore();
-const leave = useLeaveStore();
 const ann = useAnnouncementStore();
 const notif = useNotificationStore();
 
@@ -38,15 +36,26 @@ const quickActions = computed(() => [
   { to: "/leave", label: t("nav.leave"), icon: "◈" },
   { to: "/expense", label: t("expense.title"), icon: "₪" },
   { to: "/tasks", label: t("tasks.title"), icon: "◆" },
-  { to: "/announcements", label: t("announce.title"), icon: "✎" },
+  { to: "/payslip", label: t("payslip.title"), icon: "₹" },
 ]);
 
-const primaryBalance = computed(() => leave.types[0]?.balance ?? 0);
+const recentCheckins = computed(() => checkin.history.slice(0, 3));
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    hour: "2-digit", minute: "2-digit",
+    day: "2-digit", month: "short",
+  });
+}
 
 onMounted(async () => {
   await profile.load();
   await checkin.refreshToday();
-  await leave.loadTypes();
+  // Surface the last 3 check-ins on the home screen (bug #7).
+  // loadHistory swallows offline errors; queue-derived items get merged into
+  // the view on the checkin history page.
+  try { await checkin.loadHistory(1); } catch { /* offline */ }
   await ann.load(session.user ?? "");
   await notif.load();
 });
@@ -73,16 +82,28 @@ onMounted(async () => {
       </AppButton>
     </HeroCard>
 
-    <section class="dash__chips">
-      <span class="dash__chip">
-        {{ t('dashboard.leave_balance') }}: <strong>{{ primaryBalance.toFixed(1) }}</strong>
-      </span>
-      <span v-if="notif.unread > 0" class="dash__chip is-accent">
-        {{ notif.unread }} {{ t('dashboard.unread') }}
-      </span>
-    </section>
-
     <QuickActionGrid :items="quickActions" />
+
+    <section v-if="recentCheckins.length" class="dash__recent">
+      <header class="dash__recent-head">
+        <h3>{{ t('checkin.history') }}</h3>
+        <RouterLink to="/checkin/history" class="dash__recent-link">
+          {{ t('leave.view_list') }}
+        </RouterLink>
+      </header>
+      <ul class="dash__recent-list">
+        <li v-for="r in recentCheckins" :key="r.name" class="dash__recent-row">
+          <span
+            class="dash__recent-tag"
+            :class="r.log_type === 'IN' ? 'is-in' : 'is-out'"
+          >{{ r.log_type === 'IN' ? t('checkin.check_in') : t('checkin.check_out') }}</span>
+          <span class="dash__recent-sub">
+            {{ r.custom_location_address || r.custom_task || '—' }}
+          </span>
+          <time class="dash__recent-time">{{ fmtTime(r.time) }}</time>
+        </li>
+      </ul>
+    </section>
 
     <article
       v-if="ann.feed[0]"
@@ -115,9 +136,41 @@ onMounted(async () => {
 }
 [dir="rtl"] .dashboard__greeting { font-family: var(--font-display-ar); font-weight: 500; }
 .dash__today-status { margin: 0 0 10px; color: var(--ink-secondary); font-size: 13px; }
-.dash__chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.dash__chip { background: var(--bg-sunk); padding: 6px 12px; border-radius: var(--r-full); font-size: 13px; }
-.dash__chip.is-accent { background: var(--accent-soft); color: var(--accent); }
+
+.dash__recent {
+  background: var(--bg-surface); border-radius: var(--r-lg); box-shadow: var(--e-1);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.dash__recent-head { display: flex; justify-content: space-between; align-items: baseline; }
+.dash__recent-head h3 {
+  font-family: var(--font-display); font-weight: 500; font-size: 15px; margin: 0;
+}
+.dash__recent-link {
+  font-size: 12px; color: var(--ink-secondary);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.dash__recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dash__recent-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--hairline);
+}
+.dash__recent-row:first-child { border-top: 0; }
+.dash__recent-tag {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  padding: 3px 8px; border-radius: var(--r-full);
+  text-transform: uppercase;
+}
+.dash__recent-tag.is-in { background: var(--accent-soft, #d7e7e4); color: var(--accent, #2E5D5A); }
+.dash__recent-tag.is-out { background: var(--bg-sunk); color: var(--ink-secondary); }
+.dash__recent-sub {
+  font-size: 13px; color: var(--ink-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dash__recent-time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-secondary); }
 .dash__ann {
   background: var(--bg-surface); border-radius: var(--r-lg);
   box-shadow: var(--e-1); padding: 14px; cursor: pointer;

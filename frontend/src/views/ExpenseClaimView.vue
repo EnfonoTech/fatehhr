@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
@@ -15,6 +15,11 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useExpenseStore();
 
+onMounted(() => {
+  // Pre-seed the dropdown. If offline, keeps whatever was last cached.
+  store.loadTypes();
+});
+
 const lines = ref<DraftLine[]>([{
   expense_type: "",
   expense_date: new Date().toISOString().slice(0, 10),
@@ -22,6 +27,17 @@ const lines = ref<DraftLine[]>([{
   description: "",
   receipt_photo_id: null,
 }]);
+
+// Default the type once the list loads, so user doesn't have to pick.
+watch(
+  () => store.types.length,
+  (n) => {
+    if (!n) return;
+    for (const ln of lines.value) {
+      if (!ln.expense_type) ln.expense_type = store.types[0].name;
+    }
+  },
+);
 const busy = ref(false);
 const msg = ref<string | null>(null);
 
@@ -74,7 +90,10 @@ async function submit() {
 
     <Card v-for="(ln, i) in lines" :key="i" class="expense__line">
       <label><span>{{ t('expense.type') }}</span>
-        <input v-model="ln.expense_type" type="text" placeholder="e.g. Travel" /></label>
+        <select v-model="ln.expense_type" class="expense__select">
+          <option v-if="!store.types.length" value="">{{ t('more.loading') }}</option>
+          <option v-for="tp in store.types" :key="tp.name" :value="tp.name">{{ tp.name }}</option>
+        </select></label>
       <label><span>{{ t('expense.date') }}</span>
         <input v-model="ln.expense_date" type="date" /></label>
       <label><span>{{ t('expense.amount') }}</span>
@@ -116,7 +135,7 @@ async function submit() {
   font-size: 12px; color: var(--ink-secondary);
   text-transform: uppercase; letter-spacing: .04em;
 }
-.expense__line input {
+.expense__line input, .expense__select {
   background: var(--bg-sunk); border: 0; border-radius: var(--r-md);
   padding: 12px; font-size: 15px; color: var(--ink-primary);
 }

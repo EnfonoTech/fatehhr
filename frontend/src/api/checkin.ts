@@ -10,6 +10,9 @@ export interface CheckinRow {
   custom_location_address: string | null;
   custom_selfie: string | null;
   custom_geofence_status: "disabled" | "inside" | "outside" | "unknown";
+  employee_user?: string;
+  /** Local marker — true for queued offline rows that aren't on the server yet. */
+  __pending?: boolean;
 }
 
 export const checkinApi = {

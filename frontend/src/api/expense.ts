@@ -51,5 +51,13 @@ export const expenseApi = {
   list_mine: () => apiCall<ExpenseClaimRow[]>("GET", "fatehhr.api.expense.list_mine"),
   summary: () => apiCall<ExpenseSummary>("GET", "fatehhr.api.expense.summary"),
   detail: (name: string) =>
-    apiCall<ExpenseClaimDetail>("GET", "fatehhr.api.expense.detail", { name }),
+    apiCall<ExpenseClaimDetail>(
+      "GET",
+      `fatehhr.api.expense.detail?name=${encodeURIComponent(name)}`,
+    ),
+  expense_types: () =>
+    apiCall<{ name: string; description?: string }[]>(
+      "GET",
+      "fatehhr.api.expense.expense_types",
+    ),
 };

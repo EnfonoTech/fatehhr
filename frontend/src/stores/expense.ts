@@ -14,10 +14,16 @@ export interface DraftLine {
   receipt_photo_id: string | null;
 }
 
+export interface ExpenseTypeOption {
+  name: string;
+  description: string;
+}
+
 export const useExpenseStore = defineStore("expense", {
   state: () => ({
     mine: [] as ExpenseClaimRow[],
     summary: null as ExpenseSummary | null,
+    types: [] as ExpenseTypeOption[],
   }),
   actions: {
     async loadMine() {
@@ -32,6 +38,14 @@ export const useExpenseStore = defineStore("expense", {
         this.summary = await expenseApi.summary();
       } catch {
         /* offline */
+      }
+    },
+    async loadTypes() {
+      try {
+        const rows = await expenseApi.expense_types();
+        this.types = rows.map((r) => ({ name: r.name, description: r.description ?? "" }));
+      } catch {
+        /* offline — keep whatever we had */
       }
     },
 

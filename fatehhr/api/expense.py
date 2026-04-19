@@ -62,6 +62,20 @@ def list_mine(limit: int = 50) -> list[dict]:
 
 
 @frappe.whitelist()
+def expense_types() -> list[dict]:
+	"""List Expense Claim Types for the claim form dropdown.
+	Free-text on mobile kept creating LinkValidationError on submit.
+	"""
+	rows = frappe.get_all(
+		"Expense Claim Type",
+		filters={"disabled": 0} if frappe.db.has_column("Expense Claim Type", "disabled") else {},
+		fields=["name", "description"],
+		order_by="name asc",
+	)
+	return [{"name": r.name, "description": r.description or ""} for r in rows]
+
+
+@frappe.whitelist()
 def detail(name: str) -> dict:
 	"""Full expense claim with its line items, for the mobile detail sheet.
 	Restricted to claims owned by the current user's Employee record.

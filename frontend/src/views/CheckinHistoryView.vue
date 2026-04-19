@@ -31,7 +31,9 @@ function fmt(iso: string): string {
       v-for="r in store.history"
       :key="r.name"
       :title="r.log_type === 'IN' ? t('checkin.check_in') : t('checkin.check_out')"
-      :subtitle="r.custom_location_address || (r.custom_task ?? '')"
+      :subtitle="r.__pending
+        ? t('leave.pending_sync')
+        : (r.custom_location_address || (r.custom_task ?? ''))"
       :trailing="fmt(r.time)"
       :icon="r.log_type === 'IN' ? '↑' : '↓'"
     />

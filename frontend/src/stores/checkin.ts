@@ -161,9 +161,57 @@ export const useCheckinStore = defineStore("checkin", {
     },
 
     async loadHistory(page: number = 1) {
-      const rows = await checkinApi.list({ page, page_size: 30 });
-      if (page === 1) this.history = rows;
-      else this.history.push(...rows);
+      let rows: CheckinRow[] = [];
+      try {
+        rows = await checkinApi.list({ page, page_size: 30 });
+      } catch {
+        /* offline — fall back to whatever's queued locally */
+        rows = [];
+      }
+      if (page === 1) {
+        // Merge queued offline check-ins so the history isn't blank while
+        // offline and so the user can see what they just captured.
+        const queued = await this._queuedAsRows();
+        this.history = [...queued, ...rows];
+      } else {
+        this.history.push(...rows);
+      }
+    },
+
+    async _queuedAsRows(): Promise<CheckinRow[]> {
+      try {
+        const pending = await listPending();
+        const out: CheckinRow[] = [];
+        for (const q of pending) {
+          if (q.kind !== "checkin") continue;
+          const p = q.payload as {
+            log_type: "IN" | "OUT";
+            latitude: number | null;
+            longitude: number | null;
+            address: string | null;
+            task: string | null;
+            timestamp: string;
+          };
+          out.push({
+            name: `pending:${q.id}`,
+            log_type: p.log_type,
+            time: p.timestamp,
+            custom_task: p.task,
+            custom_latitude: p.latitude,
+            custom_longitude: p.longitude,
+            custom_location_address: p.address,
+            custom_selfie: null,
+            custom_geofence_status: "unknown",
+            employee_user: "",
+            __pending: true,
+          } as CheckinRow);
+        }
+        // Most recent first — matches server ordering.
+        out.sort((a, b) => (a.time < b.time ? 1 : -1));
+        return out;
+      } catch {
+        return [];
+      }
     },
   },
 });
