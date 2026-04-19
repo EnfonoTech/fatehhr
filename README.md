@@ -8,8 +8,26 @@ with a hardened sync engine.
 
 - `fatehhr/` — Frappe v15 app (Python)
 - `frontend/` — Vue 3 SPA (Vite + Pinia + vue-i18n + idb)
-- `docs/` — specs, implementation plans, lessons learned
-- `android-capacitor/` — Capacitor wrapper (Phase 5, not yet present)
+- `android-capacitor/` — Capacitor wrapper (native Android build)
+- `customers/` — per-customer env files (`.env.demo`, …)
+- `scripts/` — version bump, build-customer, keystore, asset gen
+- `docs/` — specs, plans, lessons learned, **agent handoff**
+
+## Current state (2026-04-19)
+
+✅ **All 5 phases shipped.** Latest APK: `fatehhr-demo-1.0.14.apk` (versionCode 15).
+
+- Foundation, Offline engine, Attendance/Leave/Expense, Tasks/Payslip/Announcements/Profile, Capacitor APK — all done.
+- 56/56 E2E gates passing.
+- PWA live at https://hr-demo.enfonoerp.com/fatehhr
+- APK on [`frontend-dev` GitHub release](https://github.com/EnfonoTech/fatehhr/releases/tag/frontend-dev)
+
+### 👉 Handing off to another agent?
+
+Read **[`docs/AGENT_HANDOFF.md`](docs/AGENT_HANDOFF.md)** first. It has the full deploy
+pipeline, server creds, demo data, APK signing, and the gotcha list. Then skim
+**[`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md)** for the running diary of
+"we tried this, it broke, here's why."
 
 ## Phase 1 + 2 status (2026-04-18)
 
