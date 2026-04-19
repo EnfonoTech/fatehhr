@@ -18,7 +18,12 @@
     "locked": "Too many wrong attempts. Please sign in with your password.",
     "forgot": "Forgot PIN",
     "save": "Save PIN",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "use_biometric": "Use {label}",
+    "enroll_title": "Enable {label}?",
+    "enroll_body": "Unlock the app with {label} instead of typing your PIN. Your PIN will remain as a backup.",
+    "enroll_skip": "Not now",
+    "enroll_go": "Enable {label}"
   },
   "dashboard": {
     "greeting_morning": "Good morning, {name}",

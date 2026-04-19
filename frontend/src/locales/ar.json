@@ -16,7 +16,12 @@
     "locked": "عدد محاولات كثير. يرجى تسجيل الدخول بكلمة المرور.",
     "forgot": "نسيت الرمز",
     "save": "حفظ الرمز",
-    "unlock": "فتح"
+    "unlock": "فتح",
+    "use_biometric": "استخدم {label}",
+    "enroll_title": "تفعيل {label}؟",
+    "enroll_body": "افتح التطبيق باستخدام {label} بدلاً من إدخال الرمز. سيبقى الرمز كبديل.",
+    "enroll_skip": "ليس الآن",
+    "enroll_go": "تفعيل {label}"
   },
   "dashboard": {
     "greeting_morning": "صباح الخير، {name}",

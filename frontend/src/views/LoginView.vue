@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 import { authApi } from "@/api/auth";
@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
 import AppButton from "@/components/Button.vue";
 import VersionBadge from "@/components/VersionBadge.vue";
+import { secureGet } from "@/app/frappe";
 
 const { t, locale } = useI18n();
 const email = ref("");
@@ -19,12 +20,33 @@ const busy = ref(false);
 const session = useSessionStore();
 const router = useRouter();
 
+const emailRef = ref<HTMLInputElement | null>(null);
+const passwordRef = ref<HTMLInputElement | null>(null);
+
+// Pre-fill email from the last successful login. When it's already known the
+// user just needs to type the password, so jump focus to the password field.
+// Fixes "keyboard doesn't auto-focus the password field" on saved-login.
+onMounted(async () => {
+  const saved = await secureGet("fatehhr.last_login_email");
+  await nextTick();
+  if (saved) {
+    email.value = saved;
+    passwordRef.value?.focus();
+  } else {
+    emailRef.value?.focus();
+  }
+});
+
 async function submit() {
   busy.value = true;
   error.value = null;
   try {
-    const resp = await authApi.login(email.value.trim(), password.value);
+    const trimmed = email.value.trim();
+    const resp = await authApi.login(trimmed, password.value);
     await session.applyLogin(resp);
+    // Remember the email so next time we can skip straight to password focus.
+    const { secureSet } = await import("@/app/frappe");
+    await secureSet("fatehhr.last_login_email", trimmed);
     router.replace({ name: resp.require_pin_setup ? "pin" : "pin" });
   } catch (e) {
     error.value =
@@ -43,12 +65,22 @@ async function submit() {
     <form class="login__form" @submit.prevent="submit">
       <label>
         <span>{{ t("login.email") }}</span>
-        <input v-model="email" type="email" autocomplete="username" required />
+        <input
+          ref="emailRef"
+          v-model="email"
+          type="email"
+          inputmode="email"
+          autocomplete="username"
+          autocapitalize="off"
+          spellcheck="false"
+          required
+        />
       </label>
       <label>
         <span>{{ t("login.password") }}</span>
         <div class="login__password-wrap">
           <input
+            ref="passwordRef"
             v-model="password"
             :type="showPassword ? 'text' : 'password'"
             autocomplete="current-password"

@@ -102,6 +102,19 @@ def create(
 	})
 	doc.flags.ignore_permissions = False
 	doc.insert()
+
+	# Frappe's ORM formats datetime as "YYYY-MM-DD HH:MM:SS" on insert, so the
+	# datetime(6) column drops microseconds — two IN/OUT taps within the same
+	# second end up with identical stored `time` values. Rewrite with a direct
+	# SQL update that preserves microseconds so rapid-tap offline pairs keep
+	# their distinct moments.
+	if ts.microsecond:
+		frappe.db.sql(
+			"UPDATE `tabEmployee Checkin` SET `time`=%s WHERE name=%s",
+			(ts.isoformat(sep=" ", timespec="microseconds"), doc.name),
+		)
+		doc.reload()
+
 	frappe.db.commit()
 
 	return {

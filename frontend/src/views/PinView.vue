@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 import { authApi } from "@/api/auth";
@@ -7,6 +7,13 @@ import { ApiError } from "@/api/client";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
 import VersionBadge from "@/components/VersionBadge.vue";
+import Icon from "@/components/Icon.vue";
+import {
+  getBiometricInfo,
+  verifyBiometric,
+  enrollBiometric,
+  type BiometricInfo,
+} from "@/app/biometric";
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -18,6 +25,46 @@ const mode = computed(() => (session.requirePinSetup ? "setup" : "verify"));
 const MAX = 6;
 const MIN = 4;
 const visibleDots = computed(() => Math.max(MIN, Math.min(MAX, pin.value.length)));
+
+const bio = ref<BiometricInfo>({ available: false, enrolled: false, label: "Biometric" });
+const enrollPromptOpen = ref(false);
+
+onMounted(async () => {
+  bio.value = await getBiometricInfo();
+  // Verify mode + already enrolled → auto-prompt biometric so the user doesn't
+  // have to tap the button first. Fall back to PIN pad on failure.
+  if (mode.value === "verify" && bio.value.enrolled) {
+    const ok = await verifyBiometric();
+    if (ok) {
+      await session.markPinVerified();
+      router.replace({ name: "dashboard" });
+    }
+  }
+});
+
+async function useBiometric() {
+  const ok = await verifyBiometric();
+  if (ok) {
+    await session.markPinVerified();
+    router.replace({ name: "dashboard" });
+  } else {
+    error.value = t("pin.wrong");
+  }
+}
+
+async function enrollAfterSetup() {
+  enrollPromptOpen.value = false;
+  const ok = await enrollBiometric();
+  if (ok) {
+    bio.value = await getBiometricInfo();
+  }
+  router.replace({ name: "dashboard" });
+}
+
+function skipEnroll() {
+  enrollPromptOpen.value = false;
+  router.replace({ name: "dashboard" });
+}
 
 function press(n: string) {
   if (pin.value.length < MAX) pin.value += n;
@@ -36,7 +83,13 @@ async function submit() {
       await session.cachePinHash(pin.value);
       await session.markPinSet();
       await session.markPinVerified();
-      router.replace({ name: "dashboard" });
+      // If biometric hardware is available and the user hasn't already
+      // enrolled, offer it once. Otherwise go straight to dashboard.
+      if (bio.value.available && !bio.value.enrolled) {
+        enrollPromptOpen.value = true;
+      } else {
+        router.replace({ name: "dashboard" });
+      }
       return;
     }
 
@@ -119,6 +172,34 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
         <span>{{ mode === 'setup' ? t('pin.save') : t('pin.unlock') }}</span>
       </button>
     </div>
+
+    <!-- Biometric unlock shortcut (verify mode) -->
+    <button
+      v-if="mode === 'verify' && bio.enrolled && pin.length < MIN"
+      class="pin__bio"
+      type="button"
+      @click="useBiometric"
+    >
+      <span class="pin__bio-icon"><Icon name="user" :size="22" /></span>
+      <span class="pin__bio-label">{{ t('pin.use_biometric', { label: bio.label }) }}</span>
+    </button>
+
+    <!-- Enrolment prompt after successful PIN setup -->
+    <div v-if="enrollPromptOpen" class="pin__enroll">
+      <div class="pin__enroll-card">
+        <h3>{{ t('pin.enroll_title', { label: bio.label }) }}</h3>
+        <p>{{ t('pin.enroll_body', { label: bio.label }) }}</p>
+        <div class="pin__enroll-row">
+          <button class="pin__enroll-skip" type="button" @click="skipEnroll">
+            {{ t('pin.enroll_skip') }}
+          </button>
+          <button class="pin__enroll-go" type="button" @click="enrollAfterSetup">
+            {{ t('pin.enroll_go', { label: bio.label }) }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <VersionBadge />
   </main>
 </template>
@@ -158,4 +239,50 @@ const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin
   font-size: 16px; font-weight: 600; letter-spacing: 0.02em;
 }
 .pin__submit-btn:active { transform: translateY(1px); }
+
+.pin__bio {
+  position: fixed; bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: var(--r-full);
+  background: var(--bg-surface); box-shadow: var(--e-1);
+  border: 0; cursor: pointer;
+  color: var(--ink-primary); font-size: 14px; font-weight: 500;
+}
+.pin__bio:active { background: var(--bg-sunk); transform: translateX(-50%) scale(0.97); }
+.pin__bio-icon {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: var(--r-full);
+  background: var(--accent-soft, #e8f0ee); color: var(--accent, #2E5D5A);
+}
+
+.pin__enroll {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: grid; place-items: center; z-index: 200;
+  padding: 24px;
+}
+.pin__enroll-card {
+  background: var(--bg-surface); border-radius: var(--r-lg);
+  padding: 24px; max-width: 360px; width: 100%;
+  box-shadow: var(--e-3);
+}
+.pin__enroll-card h3 {
+  font-family: var(--font-display); font-weight: 500; font-size: 18px;
+  margin: 0 0 8px; letter-spacing: -0.01em;
+}
+.pin__enroll-card p {
+  margin: 0 0 20px; color: var(--ink-secondary); font-size: 14px; line-height: 1.5;
+}
+.pin__enroll-row { display: flex; gap: 10px; justify-content: flex-end; }
+.pin__enroll-skip {
+  padding: 10px 16px; border-radius: var(--r-full);
+  background: transparent; border: 0;
+  color: var(--ink-secondary); font-size: 14px; cursor: pointer;
+}
+.pin__enroll-go {
+  padding: 10px 20px; border-radius: var(--r-full);
+  background: var(--accent, #2E5D5A); color: var(--accent-ink, #fff);
+  border: 0; font-size: 14px; font-weight: 500; cursor: pointer;
+}
 </style>
