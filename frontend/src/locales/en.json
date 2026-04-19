@@ -117,6 +117,7 @@
   },
   "leave": {
     "title": "Leave",
+    "title_hub": "Leaves & Holidays",
     "apply": "Apply",
     "mine": "My Leaves",
     "type": "Leave Type",
@@ -124,6 +125,14 @@
     "half_day": "Half day",
     "reason": "Reason",
     "balance_card": "Balance",
+    "balance_title": "Leave Balance",
+    "balance_suffix": "balance",
+    "view_history": "View Leave History",
+    "recent": "Recent Leaves",
+    "view_list": "View List",
+    "request_a_leave": "Request a Leave",
+    "no_allocation": "No leave allocation yet. Contact HR.",
+    "pending_local": "Pending Sync",
     "submit": "Submit",
     "submitted": "Submitted.",
     "queued": "Queued — will submit when online.",
@@ -152,6 +161,7 @@
   },
   "expense": {
     "title": "Expense Claim",
+    "title_hub": "Expense Claims",
     "mine": "My Claims",
     "type": "Type",
     "date": "Date",
@@ -165,7 +175,13 @@
     "submitted": "Submitted.",
     "queued": "Queued — will submit when online.",
     "receipt_required": "Every line needs a receipt photo.",
-    "empty": "No claims yet."
+    "empty": "No claims yet.",
+    "claimed": "Total Claimed",
+    "pending": "Pending",
+    "approved": "Approved",
+    "paid": "Paid",
+    "new_claim": "New Claim",
+    "recent": "Recent Claims"
   },
   "sync_errors": {
     "title": "Sync Errors",

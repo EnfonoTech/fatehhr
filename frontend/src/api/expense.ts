@@ -17,6 +17,14 @@ export interface ExpenseClaimRow {
   approval_status: string;
 }
 
+export interface ExpenseSummary {
+  claimed: number;
+  pending: number;
+  approved: number;
+  paid: number;
+  count: number;
+}
+
 export const expenseApi = {
   submit: (lines: ExpenseLine[], company?: string) =>
     apiCall<{ name: string; total_claimed_amount: number }>(
@@ -25,4 +33,5 @@ export const expenseApi = {
       { lines, company },
     ),
   list_mine: () => apiCall<ExpenseClaimRow[]>("GET", "fatehhr.api.expense.list_mine"),
+  summary: () => apiCall<ExpenseSummary>("GET", "fatehhr.api.expense.summary"),
 };

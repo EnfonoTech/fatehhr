@@ -21,10 +21,27 @@ def types_with_balance() -> list[dict]:
 			balance = get_leave_balance_on(employee=employee, leave_type=name, date=today) or 0
 		except Exception:
 			balance = 0
+		# Total allocated for the period covering today
+		try:
+			allocs = frappe.get_all(
+				"Leave Allocation",
+				filters={
+					"employee": employee,
+					"leave_type": name,
+					"docstatus": 1,
+					"from_date": ["<=", today],
+					"to_date": [">=", today],
+				},
+				fields=["total_leaves_allocated"],
+			)
+			total = sum(float(a.total_leaves_allocated or 0) for a in allocs)
+		except Exception:
+			total = 0.0
 		out.append({
 			"leave_type": name,
 			"label": t.get("leave_type_name"),
 			"balance": float(balance),
+			"total": float(total),
 			"color": t.get("color"),
 		})
 	return out

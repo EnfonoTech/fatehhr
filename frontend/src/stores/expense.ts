@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { expenseApi, type ExpenseLine, type ExpenseClaimRow } from "@/api/expense";
+import { expenseApi, type ExpenseLine, type ExpenseClaimRow, type ExpenseSummary } from "@/api/expense";
 import { saveItem } from "@/offline/queue";
 import { useSyncStore } from "@/stores/sync";
 import { uploadPhoto } from "@/offline/photos";
@@ -16,11 +16,19 @@ export interface DraftLine {
 export const useExpenseStore = defineStore("expense", {
   state: () => ({
     mine: [] as ExpenseClaimRow[],
+    summary: null as ExpenseSummary | null,
   }),
   actions: {
     async loadMine() {
       try {
         this.mine = await expenseApi.list_mine();
+      } catch {
+        /* offline */
+      }
+    },
+    async loadSummary() {
+      try {
+        this.summary = await expenseApi.summary();
       } catch {
         /* offline */
       }

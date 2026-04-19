@@ -4,6 +4,7 @@ export interface LeaveTypeBalance {
   leave_type: string;
   label: string;
   balance: number;
+  total: number;
   color: string | null;
 }
 

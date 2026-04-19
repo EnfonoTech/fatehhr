@@ -46,6 +46,7 @@ async function submit() {
     });
     message.value = res.mode === "online" ? t("leave.submitted") : t("leave.queued");
     reason.value = "";
+    setTimeout(() => router.push("/leave"), 600);
   } catch (e) {
     message.value = (e as Error)?.message ?? "error";
   } finally {
@@ -56,12 +57,8 @@ async function submit() {
 
 <template>
   <main class="leave-apply">
-    <TopAppBar :title="t('leave.title')" back @back="router.back()" />
+    <TopAppBar :title="t('leave.request_a_leave')" back @back="router.back()" />
     <SyncBar />
-    <div class="leave-apply__tabs">
-      <RouterLink to="/leave" class="tab is-active">{{ t("leave.apply") }}</RouterLink>
-      <RouterLink to="/leave/mine" class="tab">{{ t("leave.mine") }}</RouterLink>
-    </div>
 
     <form class="leave-apply__form" @submit.prevent="submit">
       <label>

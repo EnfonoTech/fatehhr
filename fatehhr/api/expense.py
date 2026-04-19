@@ -59,3 +59,34 @@ def list_mine(limit: int = 50) -> list[dict]:
 		order_by="posting_date desc",
 		limit=int(limit),
 	)
+
+
+@frappe.whitelist()
+def summary() -> dict:
+	"""Aggregated totals for the current user: claimed / pending / approved / paid."""
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if not employee:
+		return {"claimed": 0, "pending": 0, "approved": 0, "paid": 0, "count": 0}
+	rows = frappe.get_all(
+		"Expense Claim",
+		filters={"employee": employee},
+		fields=["total_claimed_amount", "total_sanctioned_amount", "status", "approval_status"],
+	)
+	claimed = sum(float(r.total_claimed_amount or 0) for r in rows)
+	pending = sum(
+		float(r.total_claimed_amount or 0) for r in rows
+		if (r.approval_status or "Draft") not in ("Approved", "Rejected")
+		and (r.status or "Draft") not in ("Paid", "Cancelled")
+	)
+	approved = sum(
+		float(r.total_sanctioned_amount or 0) for r in rows
+		if r.approval_status == "Approved"
+	)
+	paid = sum(float(r.total_sanctioned_amount or 0) for r in rows if r.status == "Paid")
+	return {
+		"claimed": round(claimed, 2),
+		"pending": round(pending, 2),
+		"approved": round(approved, 2),
+		"paid": round(paid, 2),
+		"count": len(rows),
+	}
