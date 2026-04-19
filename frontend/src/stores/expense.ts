@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { expenseApi, type ExpenseLine, type ExpenseClaimRow, type ExpenseSummary } from "@/api/expense";
+import { ApiError } from "@/api/client";
 import { saveItem } from "@/offline/queue";
 import { useSyncStore } from "@/stores/sync";
 import { uploadPhoto } from "@/offline/photos";
@@ -56,9 +57,14 @@ export const useExpenseStore = defineStore("expense", {
           }
           const r = await expenseApi.submit(resolved);
           await this.loadMine();
+          await this.loadSummary();
           return { mode: "online" as const, row: r };
-        } catch {
-          /* fall through */
+        } catch (err) {
+          // ApiError = server validation failed (bad expense type, missing
+          // category, etc). Surface it — don't queue something the server
+          // will reject again, that just fills the sync-errors screen.
+          if (err instanceof ApiError) throw err;
+          /* network failure — queue below */
         }
       }
 

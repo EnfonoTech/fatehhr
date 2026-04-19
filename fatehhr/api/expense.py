@@ -62,6 +62,38 @@ def list_mine(limit: int = 50) -> list[dict]:
 
 
 @frappe.whitelist()
+def detail(name: str) -> dict:
+	"""Full expense claim with its line items, for the mobile detail sheet.
+	Restricted to claims owned by the current user's Employee record.
+	"""
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if not employee:
+		frappe.throw(frappe._("No Employee linked to this user."), frappe.PermissionError)
+	owner_emp = frappe.db.get_value("Expense Claim", name, "employee")
+	if owner_emp != employee:
+		frappe.throw(frappe._("Not allowed."), frappe.PermissionError)
+	doc = frappe.get_doc("Expense Claim", name)
+	lines = []
+	for ln in (doc.get("expenses") or []):
+		lines.append({
+			"expense_date": str(ln.expense_date) if ln.expense_date else None,
+			"expense_type": ln.expense_type,
+			"description": ln.description or "",
+			"amount": float(ln.amount or 0),
+			"sanctioned_amount": float(ln.sanctioned_amount or 0),
+		})
+	return {
+		"name": doc.name,
+		"posting_date": str(doc.posting_date) if doc.posting_date else None,
+		"status": doc.status,
+		"approval_status": doc.approval_status,
+		"total_claimed_amount": float(doc.total_claimed_amount or 0),
+		"total_sanctioned_amount": float(doc.total_sanctioned_amount or 0),
+		"lines": lines,
+	}
+
+
+@frappe.whitelist()
 def summary() -> dict:
 	"""Aggregated totals for the current user: claimed / pending / approved / paid."""
 	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")

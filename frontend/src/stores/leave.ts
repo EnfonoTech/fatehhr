@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { leaveApi, type LeaveTypeBalance, type LeaveRow } from "@/api/leave";
+import { ApiError } from "@/api/client";
 import { saveItem } from "@/offline/queue";
 import { useSyncStore } from "@/stores/sync";
 import { v4 as uuid } from "uuid";
@@ -47,8 +48,13 @@ export const useLeaveStore = defineStore("leave", {
           const r = await leaveApi.apply(p);
           await this.loadMine();
           return { mode: "online" as const, row: r };
-        } catch {
-          /* fall through */
+        } catch (err) {
+          // ApiError = the server answered with a validation error (e.g.
+          // "leave balance exhausted"). Do NOT queue — surface it so the user
+          // can fix their input. Only fall through to the offline queue for
+          // actual network failures (TypeError "Failed to fetch" etc.).
+          if (err instanceof ApiError) throw err;
+          /* network failure — queue below */
         }
       }
       const draftId = uuid();
