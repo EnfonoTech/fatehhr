@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from "vue";
+import { onMounted, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
@@ -11,19 +11,51 @@ import Icon from "@/components/Icon.vue";
 import { useProfileStore } from "@/stores/profile";
 import { useSessionStore } from "@/stores/session";
 import { setLocale } from "@/app/i18n";
+import {
+  getBiometricInfo,
+  enrollBiometric,
+  disableBiometric,
+  type BiometricInfo,
+} from "@/app/biometric";
 
 const { t, locale } = useI18n();
 const router = useRouter();
 const profile = useProfileStore();
 const session = useSessionStore();
 
-onMounted(() => profile.load());
+const bio = ref<BiometricInfo>({ available: false, enrolled: false, label: "Biometric" });
+const bioBusy = ref(false);
+const bioMessage = ref<string | null>(null);
+
+onMounted(async () => {
+  profile.load();
+  bio.value = await getBiometricInfo();
+});
 
 const p = computed(() => profile.profile);
 
 function mask(s?: string | null) {
   if (!s) return "—";
   return s.length <= 4 ? "•".repeat(s.length) : "•".repeat(s.length - 4) + s.slice(-4);
+}
+
+async function toggleBiometric() {
+  bioBusy.value = true;
+  bioMessage.value = null;
+  try {
+    if (bio.value.enrolled) {
+      await disableBiometric();
+      bio.value = await getBiometricInfo();
+      bioMessage.value = t("more.bio_disabled");
+    } else {
+      const ok = await enrollBiometric();
+      bio.value = await getBiometricInfo();
+      bioMessage.value = ok ? t("more.bio_enabled", { label: bio.value.label }) : t("more.bio_cancelled");
+    }
+  } finally {
+    bioBusy.value = false;
+    window.setTimeout(() => { bioMessage.value = null; }, 3000);
+  }
 }
 
 async function logout() {
@@ -92,6 +124,30 @@ async function logout() {
         <span class="more__link-label">{{ t('sync_errors.title') }}</span>
         <Icon name="chevron-right" :size="18" class="more__link-chev" />
       </button>
+    </Card>
+
+    <!-- Security — biometric unlock toggle -->
+    <Card v-if="bio.available" class="more__section more__bio">
+      <h3>{{ t('more.security') }}</h3>
+      <div class="more__bio-row">
+        <span class="more__bio-icon"><Icon name="user" :size="18" /></span>
+        <span class="more__bio-body">
+          <span class="more__bio-title">{{ t('more.bio_title', { label: bio.label }) }}</span>
+          <span class="more__bio-sub">
+            {{ bio.enrolled ? t('more.bio_on') : t('more.bio_off') }}
+          </span>
+        </span>
+        <button
+          class="more__bio-toggle"
+          :class="{ 'is-on': bio.enrolled }"
+          :disabled="bioBusy"
+          @click="toggleBiometric"
+          :aria-label="bio.enrolled ? t('more.bio_turn_off') : t('more.bio_turn_on')"
+        >
+          <span class="more__bio-toggle-dot" />
+        </button>
+      </div>
+      <p v-if="bioMessage" class="more__bio-msg">{{ bioMessage }}</p>
     </Card>
 
     <Card class="more__section">
@@ -169,4 +225,37 @@ async function logout() {
 .more__link-label { flex: 1; }
 .more__link-chev { color: var(--ink-tertiary); margin-left: auto; }
 [dir="rtl"] .more__link-chev { transform: scaleX(-1); margin-right: auto; margin-left: 0; }
+
+.more__bio-row { display: flex; align-items: center; gap: 12px; }
+.more__bio-icon {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  background: var(--accent-soft, #e8f0ee); color: var(--accent, #2E5D5A);
+  border-radius: var(--r-md); flex-shrink: 0;
+}
+.more__bio-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.more__bio-title { font-size: 14px; font-weight: 500; color: var(--ink-primary); }
+.more__bio-sub { font-size: 12px; color: var(--ink-secondary); }
+.more__bio-toggle {
+  position: relative;
+  width: 46px; height: 26px;
+  border-radius: 13px; border: 0;
+  background: var(--hairline);
+  cursor: pointer; flex-shrink: 0;
+  transition: background 180ms ease;
+}
+.more__bio-toggle.is-on { background: var(--accent, #2E5D5A); }
+.more__bio-toggle:disabled { opacity: 0.55; cursor: not-allowed; }
+.more__bio-toggle-dot {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  transition: transform 180ms ease;
+}
+.more__bio-toggle.is-on .more__bio-toggle-dot { transform: translateX(20px); }
+[dir="rtl"] .more__bio-toggle-dot { left: auto; right: 3px; }
+[dir="rtl"] .more__bio-toggle.is-on .more__bio-toggle-dot { transform: translateX(-20px); }
+.more__bio-msg {
+  margin: 10px 0 0;
+  font-size: 12px; color: var(--ink-secondary);
+}
 </style>

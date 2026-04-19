@@ -162,7 +162,16 @@
     "language": "Language",
     "logout": "Log out",
     "loading": "Loading…",
-    "read_only_hint": "Editing your bank details? Contact HR."
+    "read_only_hint": "Editing your bank details? Contact HR.",
+    "security": "Security",
+    "bio_title": "Unlock with {label}",
+    "bio_on": "On — fingerprint or face unlocks the app",
+    "bio_off": "Off — you'll enter your PIN to unlock",
+    "bio_turn_on": "Turn on biometric unlock",
+    "bio_turn_off": "Turn off biometric unlock",
+    "bio_enabled": "{label} unlock enabled.",
+    "bio_disabled": "Biometric unlock disabled.",
+    "bio_cancelled": "Biometric setup cancelled."
   },
   "expense": {
     "title": "Expense Claim",
