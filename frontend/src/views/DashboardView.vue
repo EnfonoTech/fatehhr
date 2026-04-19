@@ -43,9 +43,9 @@ const quickActions = computed(() => [
 const recentCheckins = computed(() => checkin.history.slice(0, 3));
 
 function fmtTime(iso: string): string {
-  const d = new Date(iso);
+  const d = new Date(iso.replace(" ", "T"));
   return d.toLocaleString(undefined, {
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
     day: "2-digit", month: "short",
   });
 }

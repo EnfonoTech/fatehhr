@@ -5,6 +5,7 @@ import { Geolocation } from "@capacitor/geolocation";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { Network, type ConnectionStatus } from "@capacitor/network";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 
 export function isNativePlatform(): boolean {
   return (Capacitor as unknown as { isNativePlatform?: () => boolean }).isNativePlatform?.() ?? false;
@@ -82,6 +83,55 @@ export async function takePhotoBlob(): Promise<{ blob: Blob; mime: string } | nu
   } catch {
     return null;
   }
+}
+
+/**
+ * Save a Blob to the device. Works on:
+ *   - Native (Capacitor): uses @capacitor/filesystem → Documents dir, returns
+ *     the on-device path.
+ *   - Web browsers: falls back to the anchor-download trick.
+ *
+ * The APK WebView silently ignores `<a download>` clicks which is why the
+ * "download PDF" button did nothing on the 1.0.12 build.
+ */
+export async function saveBlobToDevice(blob: Blob, filename: string): Promise<{ uri?: string; downloaded: boolean }> {
+  // Slashes/spaces in Frappe doc names break filesystem writes and share sheets.
+  const safeName = filename.replace(/[^A-Za-z0-9._-]+/g, "_");
+
+  if (isNativePlatform()) {
+    const base64 = await blobToBase64(blob);
+    const res = await Filesystem.writeFile({
+      path: safeName,
+      data: base64,
+      directory: Directory.Documents,
+      recursive: true,
+    });
+    return { uri: res.uri, downloaded: true };
+  }
+
+  // Web: anchor-click trick
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = safeName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return { downloaded: true };
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const s = String(reader.result ?? "");
+      // Strip the "data:*/*;base64," prefix — Filesystem.writeFile wants raw.
+      resolve(s.replace(/^data:[^;]+;base64,/, ""));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 export async function hapticLight() { try { await Haptics.impact({ style: ImpactStyle.Light }); } catch { /* ignore */ } }

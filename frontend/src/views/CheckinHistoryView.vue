@@ -15,9 +15,12 @@ const store = useCheckinStore();
 onMounted(() => store.loadHistory(1));
 
 function fmt(iso: string): string {
-  const d = new Date(iso);
+  // Server sends naive datetimes ("2026-04-19 09:00:00") which new Date()
+  // reads in the DEVICE timezone. Normalise to ISO-Z so close-together IN/OUT
+  // taps render with distinct seconds regardless of locale.
+  const d = new Date(iso.replace(" ", "T"));
   return d.toLocaleString(undefined, {
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
     day: "2-digit", month: "short",
   });
 }
