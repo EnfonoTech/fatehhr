@@ -1,5 +1,8 @@
+from datetime import timezone
+
 import frappe
-from frappe.utils import now_datetime, get_datetime, get_system_timezone
+from dateutil.parser import isoparse
+from frappe.utils import now_datetime, get_system_timezone
 
 try:
 	from zoneinfo import ZoneInfo
@@ -9,16 +12,27 @@ except ImportError:  # py<3.9 fallback
 from fatehhr.utils.geofence import classify
 
 
-def _to_site_tz(ts):
-	"""Convert a timezone-aware datetime to a naive site-local datetime.
-	Frappe stores datetimes as naive values assumed to be in site timezone.
-	Offline clients ship UTC ISO strings (e.g. "2026-04-19T06:00:00.000Z");
-	without conversion a checkin recorded at 09:00 IST saves as 06:00 and
-	breaks the timeline ordering. Keeps naive inputs unchanged.
+def _parse_client_ts(ts_str):
+	"""Parse a client ISO timestamp into a naive site-local datetime.
+
+	Why this exists: Frappe's own `get_datetime` was dropping the tz on
+	ISO-with-'Z' strings from `new Date().toISOString()`, so both IN and
+	OUT from a single offline session ended up saved with the drain-time
+	clock. `dateutil.isoparse` keeps the tz; we then convert to site tz
+	and strip, which is the format Frappe's ORM expects.
 	"""
-	if ts.tzinfo is None:
-		return ts
-	return ts.astimezone(ZoneInfo(get_system_timezone())).replace(tzinfo=None)
+	if not ts_str:
+		return None
+	try:
+		dt = isoparse(ts_str)
+	except (ValueError, TypeError):
+		return None
+	# JS toISOString() always emits 'Z' (UTC). Be tolerant of naive input
+	# (e.g. some test payloads) by assuming UTC in that case.
+	if dt.tzinfo is None:
+		dt = dt.replace(tzinfo=timezone.utc)
+	site_tz = ZoneInfo(get_system_timezone())
+	return dt.astimezone(site_tz).replace(tzinfo=None)
 
 
 @frappe.whitelist()
@@ -52,7 +66,7 @@ def create(
 		) or (None, None, None)
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
-	ts = _to_site_tz(get_datetime(timestamp)) if timestamp else now_datetime()
+	ts = _parse_client_ts(timestamp) or now_datetime()
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,

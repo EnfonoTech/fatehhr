@@ -9,6 +9,7 @@ import QuickActionGrid from "@/components/QuickActionGrid.vue";
 import NotificationBell from "@/components/NotificationBell.vue";
 import AppButton from "@/components/Button.vue";
 import VersionBadge from "@/components/VersionBadge.vue";
+import Icon from "@/components/Icon.vue";
 import { useSessionStore } from "@/stores/session";
 import { useProfileStore } from "@/stores/profile";
 import { useCheckinStore } from "@/stores/checkin";
@@ -33,10 +34,10 @@ const greetingKey = computed<
 });
 
 const quickActions = computed(() => [
-  { to: "/leave", label: t("nav.leave"), icon: "◈" },
-  { to: "/expense", label: t("expense.title"), icon: "₪" },
-  { to: "/tasks", label: t("tasks.title"), icon: "◆" },
-  { to: "/payslip", label: t("payslip.title"), icon: "₹" },
+  { to: "/leave", label: t("nav.leave"), icon: "leave" as const },
+  { to: "/expense", label: t("expense.title"), icon: "receipt" as const },
+  { to: "/tasks", label: t("tasks.title"), icon: "tasks" as const },
+  { to: "/payslip", label: t("payslip.title"), icon: "payslip" as const },
 ]);
 
 const recentCheckins = computed(() => checkin.history.slice(0, 3));
@@ -94,11 +95,18 @@ onMounted(async () => {
       <ul class="dash__recent-list">
         <li v-for="r in recentCheckins" :key="r.name" class="dash__recent-row">
           <span
-            class="dash__recent-tag"
+            class="dash__recent-icon"
             :class="r.log_type === 'IN' ? 'is-in' : 'is-out'"
-          >{{ r.log_type === 'IN' ? t('checkin.check_in') : t('checkin.check_out') }}</span>
-          <span class="dash__recent-sub">
-            {{ r.custom_location_address || r.custom_task || '—' }}
+          >
+            <Icon :name="r.log_type === 'IN' ? 'arrow-down' : 'arrow-up'" :size="16" />
+          </span>
+          <span class="dash__recent-body">
+            <span class="dash__recent-title">
+              {{ r.log_type === 'IN' ? t('checkin.check_in') : t('checkin.check_out') }}
+            </span>
+            <span class="dash__recent-sub">
+              {{ r.custom_location_address || r.custom_task || '—' }}
+            </span>
           </span>
           <time class="dash__recent-time">{{ fmtTime(r.time) }}</time>
         </li>
@@ -149,25 +157,34 @@ onMounted(async () => {
   font-size: 12px; color: var(--ink-secondary);
   text-decoration: underline; text-underline-offset: 3px;
 }
-.dash__recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dash__recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .dash__recent-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--hairline);
 }
 .dash__recent-row:first-child { border-top: 0; }
-.dash__recent-tag {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
-  padding: 3px 8px; border-radius: var(--r-full);
-  text-transform: uppercase;
+.dash__recent-icon {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: var(--r-full);
+  flex-shrink: 0;
 }
-.dash__recent-tag.is-in { background: var(--accent-soft, #d7e7e4); color: var(--accent, #2E5D5A); }
-.dash__recent-tag.is-out { background: var(--bg-sunk); color: var(--ink-secondary); }
+.dash__recent-icon.is-in {
+  background: var(--success-soft, #d8e8de);
+  color: var(--success, #2a6b3a);
+}
+.dash__recent-icon.is-out {
+  background: var(--bg-sunk);
+  color: var(--ink-secondary);
+}
+.dash__recent-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dash__recent-title { font-size: 13px; font-weight: 500; color: var(--ink-primary); }
 .dash__recent-sub {
-  font-size: 13px; color: var(--ink-primary);
+  font-size: 11px; color: var(--ink-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dash__recent-time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-secondary); }

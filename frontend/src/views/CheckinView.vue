@@ -97,6 +97,13 @@ async function submit() {
       geofence.value = res.row.custom_geofence_status;
     }
     selfiePhotoId.value = null;
+    // Auto-return to home so the user sees the updated status without an
+    // extra tap. Small delay so the success message flashes.
+    window.setTimeout(() => {
+      if (router.currentRoute.value.name === "checkin") {
+        router.replace("/");
+      }
+    }, 800);
   } finally {
     busy.value = false;
   }

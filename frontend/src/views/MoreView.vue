@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav.vue";
 import Card from "@/components/Card.vue";
 import AppButton from "@/components/Button.vue";
 import VersionBadge from "@/components/VersionBadge.vue";
+import Icon from "@/components/Icon.vue";
 import { useProfileStore } from "@/stores/profile";
 import { useSessionStore } from "@/stores/session";
 import { setLocale } from "@/app/i18n";
@@ -72,20 +73,24 @@ async function logout() {
     <!-- Shortcuts -->
     <Card class="more__section more__links">
       <button class="more__link-btn" type="button" @click="router.push('/payslip')">
+        <span class="more__link-leading"><Icon name="payslip" :size="18" /></span>
         <span class="more__link-label">{{ t('payslip.title') }}</span>
-        <span class="more__link-chev" aria-hidden="true">›</span>
+        <Icon name="chevron-right" :size="18" class="more__link-chev" />
       </button>
       <button class="more__link-btn" type="button" @click="router.push('/announcements')">
+        <span class="more__link-leading"><Icon name="megaphone" :size="18" /></span>
         <span class="more__link-label">{{ t('announce.title') }}</span>
-        <span class="more__link-chev" aria-hidden="true">›</span>
+        <Icon name="chevron-right" :size="18" class="more__link-chev" />
       </button>
       <button class="more__link-btn" type="button" @click="router.push('/notifications')">
+        <span class="more__link-leading"><Icon name="bell" :size="18" /></span>
         <span class="more__link-label">{{ t('notifications.title') }}</span>
-        <span class="more__link-chev" aria-hidden="true">›</span>
+        <Icon name="chevron-right" :size="18" class="more__link-chev" />
       </button>
       <button class="more__link-btn" type="button" @click="router.push('/sync-errors')">
+        <span class="more__link-leading"><Icon name="history" :size="18" /></span>
         <span class="more__link-label">{{ t('sync_errors.title') }}</span>
-        <span class="more__link-chev" aria-hidden="true">›</span>
+        <Icon name="chevron-right" :size="18" class="more__link-chev" />
       </button>
     </Card>
 
@@ -145,7 +150,7 @@ async function logout() {
 
 .more__links { padding: 0; display: flex; flex-direction: column; }
 .more__link-btn {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; align-items: center; gap: 12px;
   padding: 14px 16px;
   background: transparent; border: 0; width: 100%;
   text-align: left; cursor: pointer;
@@ -153,6 +158,15 @@ async function logout() {
 }
 .more__link-btn + .more__link-btn { border-top: 1px solid var(--hairline); }
 .more__link-btn:active { background: var(--bg-sunk); }
-.more__link-chev { color: var(--ink-tertiary); font-size: 18px; }
-[dir="rtl"] .more__link-chev { transform: scaleX(-1); }
+.more__link-leading {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: var(--bg-sunk);
+  color: var(--ink-primary);
+  border-radius: var(--r-md);
+  flex-shrink: 0;
+}
+.more__link-label { flex: 1; }
+.more__link-chev { color: var(--ink-tertiary); margin-left: auto; }
+[dir="rtl"] .more__link-chev { transform: scaleX(-1); margin-right: auto; margin-left: 0; }
 </style>

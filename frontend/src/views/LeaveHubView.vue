@@ -6,6 +6,7 @@ import TopAppBar from "@/components/TopAppBar.vue";
 import SyncBar from "@/components/SyncBar.vue";
 import BottomNav from "@/components/BottomNav.vue";
 import GaugeCard from "@/components/GaugeCard.vue";
+import Icon from "@/components/Icon.vue";
 import Chip from "@/components/Chip.vue";
 import AppButton from "@/components/Button.vue";
 import BottomSheet from "@/components/BottomSheet.vue";
@@ -104,7 +105,9 @@ async function cancelSelected() {
           class="lhub__row"
           @click="selected = r"
         >
-          <span class="lhub__row-icon" aria-hidden="true">▦</span>
+          <span class="lhub__row-icon" aria-hidden="true">
+            <Icon name="leave" :size="18" />
+          </span>
           <span class="lhub__row-body">
             <span class="lhub__row-title">{{ r.leave_type }}</span>
             <span class="lhub__row-sub">{{ rangeOrSingle(r) }}</span>
@@ -124,7 +127,9 @@ async function cancelSelected() {
       <h2>{{ t("leave.pending_local") }}</h2>
       <div class="lhub__rows">
         <div v-for="p in store.pendingLocal" :key="p.draftId" class="lhub__row lhub__row--pending">
-          <span class="lhub__row-icon" aria-hidden="true">▦</span>
+          <span class="lhub__row-icon" aria-hidden="true">
+            <Icon name="leave" :size="18" />
+          </span>
           <span class="lhub__row-body">
             <span class="lhub__row-title">{{ p.leave_type }}</span>
             <span class="lhub__row-sub">{{ fmtDate(p.from_date) }} – {{ fmtDate(p.to_date) }}</span>
@@ -216,8 +221,11 @@ async function cancelSelected() {
 .lhub__row:active { background: var(--bg-sunk); }
 .lhub__row--pending { cursor: default; }
 .lhub__row-icon {
-  width: 28px; height: 28px; display: grid; place-items: center;
-  color: var(--ink-tertiary); font-size: 18px; flex-shrink: 0;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  color: var(--accent, #2E5D5A);
+  background: var(--accent-soft, #e8f0ee);
+  border-radius: var(--r-md);
+  flex-shrink: 0;
 }
 .lhub__row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .lhub__row-title {
