@@ -4,14 +4,15 @@ import { isNative } from "./platform";
 /**
  * Android hardware-back wiring.
  *
- * Native behaviour users expect (and that testing reported was missing):
- *   - On a detail route (e.g. /payslip/ABC) → go back to its list.
- *   - On a list route (e.g. /payslip)      → go home (/).
- *   - On home (/)                          → double-tap within 2s exits.
+ * Route-hierarchy based (NOT `window.history`):
+ *   - Detail routes (/payslip/:name)        → parent list (/payslip)
+ *   - Top-level sections (/leave, /tasks…)  → home (/)
+ *   - Home (/)                              → double-tap within 2s exits
  *
- * Capacitor's default listener goes straight to `App.exitApp()` whenever
- * there's no history entry, which is what caused "back button exits
- * immediately" complaints after app-kill restores with a single-entry stack.
+ * Using `router.back()` / `window.history` walked every visited screen,
+ * so "Home → Attendance → Leave → Expense" + Back cycled Expense → Leave →
+ * Attendance → Home, surprising users. The hierarchy map makes Back always
+ * feel like "up one level", not "undo the last navigation".
  */
 
 const EXIT_WINDOW_MS = 2000;
@@ -19,8 +20,36 @@ const TOAST_KEY = "fatehhr.back_toast";
 
 let lastBackAt = 0;
 
+/** route.name → parent route path. Anything not listed falls back to "/". */
+const PARENT_BY_ROUTE_NAME: Record<string, string> = {
+  // Check-in
+  "checkin": "/",
+  "checkin.history": "/checkin",
+  // Attendance
+  "attendance": "/",
+  // Leave
+  "leave": "/",
+  "leave.apply": "/leave",
+  "leave.list": "/leave",
+  // Expense
+  "expense": "/",
+  "expense.new": "/expense",
+  // Tasks
+  "tasks": "/",
+  // Payslip
+  "payslip": "/",
+  "payslip.detail": "/payslip",
+  // Announcements
+  "announce": "/",
+  "announce.detail": "/announcements",
+  // Other top-level
+  "notifications": "/",
+  "profile": "/",
+  "more": "/",
+  "sync.errors": "/more",
+};
+
 function showExitHint(message: string) {
-  // Lightweight toast — avoid pulling in a UI library just for this.
   const existing = document.getElementById(TOAST_KEY);
   if (existing) existing.remove();
   const el = document.createElement("div");
@@ -55,22 +84,18 @@ export async function installNativeBackHandler(router: Router): Promise<void> {
 
   App.addListener("backButton", async () => {
     const current = router.currentRoute.value;
-
-    // 1. Detail-ish routes: delegate to the router so Vue handles the
-    //    back navigation (it has a proper stack of the user's path).
-    const isHome = current.path === "/" || current.name === "dashboard";
-    const hasHistory = window.history.length > 1;
+    const routeName = typeof current.name === "string" ? current.name : "";
+    const isHome = current.path === "/" || routeName === "dashboard";
 
     if (!isHome) {
-      if (hasHistory) {
-        router.back();
-      } else {
-        router.replace("/");
-      }
+      const parent = PARENT_BY_ROUTE_NAME[routeName] ?? "/";
+      // Use replace so we don't grow the history stack; the hierarchy map
+      // already picks the correct destination — history is irrelevant.
+      router.replace(parent);
       return;
     }
 
-    // 2. On home: double-tap-to-exit within a 2s window.
+    // On home: double-tap-to-exit within a 2s window.
     const now = Date.now();
     if (now - lastBackAt <= EXIT_WINDOW_MS) {
       await App.exitApp();
