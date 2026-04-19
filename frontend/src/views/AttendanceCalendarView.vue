@@ -60,6 +60,13 @@ function statusClass(s: string): string {
 function tap(d: string) {
   selectedDate.value = d;
 }
+
+function fmtHM(iso: string): string {
+  if (!iso) return "";
+  // Server now ships UTC-ISO ("…Z"); fall back to naive parse for legacy.
+  const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T"));
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
 const selected = computed(() =>
   selectedDate.value ? store.dayFor(selectedDate.value) : null,
 );
@@ -107,7 +114,7 @@ const selected = computed(() =>
         <p>{{ t("attendance.hours") }}: <strong>{{ selected.hours_worked.toFixed(2) }}</strong></p>
         <ul class="cal__pairs" v-if="selected.pairs.length">
           <li v-for="(p, i) in selected.pairs" :key="i">
-            {{ p.in.slice(11, 16) }} → {{ p.out.slice(11, 16) }}
+            {{ fmtHM(p.in) }} → {{ fmtHM(p.out) }}
             · {{ p.task ?? t("attendance.no_task") }}
             <em v-if="p.open_pair_autoclosed">({{ t("attendance.autoclosed") }})</em>
           </li>

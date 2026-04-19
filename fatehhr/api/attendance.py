@@ -4,6 +4,8 @@ import datetime as dt
 import frappe
 from frappe.utils import get_datetime
 
+from fatehhr.api.checkin import _naive_site_to_utc_iso
+
 
 @frappe.whitelist()
 def month(year: int, month: int) -> dict:
@@ -98,8 +100,8 @@ def _build_pairs(rows, for_date):
 			if current_in:
 				dur = (t - get_datetime(current_in["time"])).total_seconds() / 3600.0
 				pairs.append({
-					"in": _iso(current_in["time"]),
-					"out": t.isoformat(),
+					"in": _naive_site_to_utc_iso(get_datetime(current_in["time"])),
+					"out": _naive_site_to_utc_iso(t),
 					"task": current_in.get("custom_task"),
 					"location": current_in.get("custom_location_address"),
 					"hours": round(max(dur, 0), 2),
@@ -115,8 +117,8 @@ def _autoclose(current_in, for_date):
 	midnight = dt.datetime.combine(for_date + dt.timedelta(days=1), dt.time.min)
 	dur = (midnight - t_in).total_seconds() / 3600.0
 	return {
-		"in": t_in.isoformat(),
-		"out": midnight.isoformat(),
+		"in": _naive_site_to_utc_iso(t_in),
+		"out": _naive_site_to_utc_iso(midnight),
 		"task": current_in.get("custom_task"),
 		"location": current_in.get("custom_location_address"),
 		"hours": round(max(dur, 0), 2),

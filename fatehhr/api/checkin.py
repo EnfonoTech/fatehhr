@@ -35,6 +35,27 @@ def _parse_client_ts(ts_str):
 	return dt.astimezone(site_tz).replace(tzinfo=None)
 
 
+def _naive_site_to_utc_iso(dt):
+	"""Convert a Frappe-stored naive site-local datetime → UTC ISO string
+	with 'Z'. Clients that roam timezones (phone in Riyadh, site in Muscat)
+	need a tz-aware value to render correctly in their own locale; a naive
+	string gets interpreted as device-local and skews the display.
+	"""
+	if dt is None:
+		return None
+	if isinstance(dt, str):
+		# DB already serialised; reparse assuming site-local.
+		try:
+			dt = isoparse(dt)
+		except (ValueError, TypeError):
+			return dt
+	if dt.tzinfo is None:
+		dt = dt.replace(tzinfo=ZoneInfo(get_system_timezone()))
+	utc_dt = dt.astimezone(timezone.utc)
+	# isoformat → "2026-04-19T15:25:16+00:00"; canonicalise to …Z
+	return utc_dt.isoformat().replace("+00:00", "Z")
+
+
 @frappe.whitelist()
 def create(
 	log_type: str,
@@ -86,7 +107,7 @@ def create(
 	return {
 		"name": doc.name,
 		"log_type": log_type,
-		"time": ts.isoformat(),
+		"time": _naive_site_to_utc_iso(ts),
 		"custom_task": task,
 		"custom_latitude": _f(latitude),
 		"custom_longitude": _f(longitude),
@@ -126,6 +147,9 @@ def list_mine(
 	)
 	for r in rows:
 		r["employee_user"] = frappe.session.user
+		# Convert naive site-local → UTC ISO so clients in any timezone
+		# display the correct local wall-clock.
+		r["time"] = _naive_site_to_utc_iso(r.get("time"))
 	return rows
 
 
