@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted } from "vue";
+import { onMounted, ref, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
@@ -15,6 +15,14 @@ const router = useRouter();
 const store = useTasksStore();
 const tick = ref(0);
 let interval: number | null = null;
+
+// Reactive label — tick dep forces 1 Hz recompute, startedAt dep ensures
+// it also updates when the timer is started/stopped elsewhere.
+const elapsedLabel = computed(() => {
+  tick.value;
+  store.running?.startedAt;
+  return store.elapsed();
+});
 
 onMounted(() => {
   store.load();
@@ -58,7 +66,7 @@ async function toggle(name: string) {
         {{ tk.project ?? '' }}{{ tk.exp_end_date ? ' · ' + tk.exp_end_date : '' }}
       </p>
       <p v-if="isRunning(tk.name)" class="tasks__elapsed">
-        {{ tick, store.elapsed() }}
+        {{ elapsedLabel }}
       </p>
       <AppButton
         :variant="isRunning(tk.name) ? 'destructive' : 'primary'"

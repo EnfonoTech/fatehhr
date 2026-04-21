@@ -21,13 +21,21 @@ export const useTasksStore = defineStore("tasks", {
   }),
   actions: {
     async load() {
+      // Restore running timer FIRST (synchronous) so the view never renders
+      // a mid-flight empty state while the tasks list request is in flight.
+      const raw = localStorage.getItem(RUNNING_KEY);
+      if (raw) {
+        try {
+          this.running = JSON.parse(raw);
+        } catch {
+          localStorage.removeItem(RUNNING_KEY);
+        }
+      }
       try {
         this.tasks = await taskApi.list_mine();
       } catch {
         /* offline */
       }
-      const raw = localStorage.getItem(RUNNING_KEY);
-      if (raw) this.running = JSON.parse(raw);
     },
 
     async start(task: string) {
@@ -125,10 +133,13 @@ export const useTasksStore = defineStore("tasks", {
     },
 
     elapsed(): string {
-      if (!this.running) return "0:00";
-      const ms = Date.now() - Date.parse(this.running.startedAt);
-      const m = Math.floor(ms / 60000);
-      return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+      if (!this.running) return "00:00:00";
+      const ms = Math.max(0, Date.now() - Date.parse(this.running.startedAt));
+      const total = Math.floor(ms / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     },
   },
 });
