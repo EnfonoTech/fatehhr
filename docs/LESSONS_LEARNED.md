@@ -294,15 +294,100 @@ non-zero salary slips.
 
 ---
 
+## Phase 6 — attendance mode + salary-safe dedupe (2026-04-22, 1.0.22)
+
+### 12. Double-OUT rows poisoning payroll
+
+**Symptom:** User taps Check Out once. Two `Employee Checkin (OUT)`
+rows appear — one online (microsecond-precision, site-local UTC+4
+correct), one offline-drained (zero-microsecond, `drift=14401s` i.e.
+shifted by the site TZ offset).
+
+**Cause:** `fatehhr.api.checkin.create` had no idempotency key. Client's
+network call succeeded online, but the offline queue ALSO held a pending
+OUT from an earlier partial attempt; when the network returned both
+paths called the endpoint and both wrote.
+
+**Salary blast radius:** `Employee Checkin` rows feed HRMS Auto
+Attendance → `Attendance` → Salary Slip `payment_days`. A stray OUT
+that pairs with the wrong IN produces zero working hours → day flips
+Absent → `payment_days` decrements → gross/net pay wrong for that day.
+
+**Fix:** `Employee Checkin.custom_client_id` custom field, `unique: 1`.
+Client mints uuid per tap (`stores/checkin.ts`, `stores/tasks.ts`),
+passes it to both online call AND the offline queue payload. Server:
+
+```python
+# checkin.py :: create
+if client_id:
+    existing = frappe.db.get_value(
+        "Employee Checkin",
+        {"custom_client_id": client_id, "employee": employee},
+        "name",
+    )
+    if existing:
+        return _row_as_response(existing)
+# ...then insert. On DuplicateEntryError (race), rollback and re-select.
+```
+
+### 13. Offline TZ regression on the WRITE path
+
+**Symptom:** Offline-drained rows had `time = creation + 14401s` and
+zero microseconds. Online rows were fine.
+
+**Cause:** `fatehhr.api.task.start_timer` / `stop_timer` were using
+`get_datetime(timestamp)` which silently drops tz on ISO-with-Z strings
+— same bug as §9 but on the WRITE path for timer-driven rows. The
+`checkin.create` endpoint was already using the correct helper; the
+task timer endpoints had been forgotten during §9's fix.
+
+**Fix:** Swap `get_datetime` for `_parse_client_ts` in both endpoints.
+
+**Rule (updated):** ANY server endpoint that accepts a client-supplied
+ISO timestamp → use `_parse_client_ts`. Never `get_datetime` on a string
+that came from JavaScript.
+
+### 14. Attendance-source ambiguity (button vs timer)
+
+**Symptom:** Task timer Start wrote both a `Timesheet` row AND an
+`Employee Checkin IN` row. If the user also used the big Check-In
+button, they got double-counted attendance pairs.
+
+**Cause:** Product decision was never made explicit in code. `task.py`
+unconditionally inserted Checkin rows. Stackable with the button.
+
+**Fix:** New single DocType `Fateh HR Settings` with `attendance_mode`:
+
+- **Checkin Based** (default) — `task.start_timer`/`stop_timer` skip the
+  Checkin insert. Timer is Timesheet-only. Button owns attendance.
+- **Timer Based** — Big Check-In button routes to a task picker that
+  calls `task.start_timer` (which creates IN + Timesheet). Tasks tab and
+  Check-In button share the same live `running` state.
+
+Explainer HTML embedded in the DocType so HR can read the logic before
+flipping. Client caches the mode in localStorage for offline correctness.
+
+### 15. Daily hours — what the endpoint returns
+
+`fatehhr.api.checkin.today_summary` returns `{worked_seconds, open_since}`.
+Server pair logic is greedy: walk rows time-ASC, on IN set `open_from`,
+on OUT sum the delta and reset. Orphan OUT or orphan IN is ignored.
+Client adds `(Date.now() - open_since)` each tick while open_since is
+non-null, so the card ticks in real time.
+
+---
+
 ## Standing rules derived from above
 
 1. **Any datetime to the client → UTC-ISO with `Z`.** No naive strings, ever.
-2. **Any new Capacitor plugin → `pnpm add` in `android-capacitor/` + `npx cap sync android`.** JS bundle alone is insufficient.
-3. **Any queue processor → `timestamp: payload.timestamp` must pass through.** Never stamp with `now()` on drain.
-4. **`apiCall("GET", ...)` body is silently dropped.** Params belong in the URL.
-5. **`ApiError` ≠ network error.** Re-throw `ApiError`, only queue on network failures.
-6. **Name sanitisation for any device filesystem / share sheet** — Frappe doc names contain `/` and spaces.
-7. **Show seconds (`HH:MM:SS`) on check-in-class data.** Minute precision hides rapid taps.
-8. **Never commit `dist/`, `*.apk`, `*.keystore`, or stale `.vue.js` artifacts.**
-9. **`bump-version.mjs` is the only way to bump `NATIVE_VERSION` / `NATIVE_VERSION_CODE`.** They stay in lockstep.
-10. **Maintenance window is 2:00–5:00 AM IST.** For same-day fixes, `supervisorctl signal QUIT` not `restart`.
+2. **Any datetime FROM the client → parse with `_parse_client_ts`.** Never `get_datetime()` on a JS ISO string (drops tz).
+3. **Any new Capacitor plugin → `pnpm add` in `android-capacitor/` + `npx cap sync android`.** JS bundle alone is insufficient.
+4. **Any queue processor → `timestamp: payload.timestamp` must pass through.** Never stamp with `now()` on drain.
+5. **`apiCall("GET", ...)` body is silently dropped.** Params belong in the URL.
+6. **`ApiError` ≠ network error.** Re-throw `ApiError`, only queue on network failures.
+7. **Name sanitisation for any device filesystem / share sheet** — Frappe doc names contain `/` and spaces.
+8. **Show seconds (`HH:MM:SS`) on check-in-class data.** Minute precision hides rapid taps.
+9. **Any endpoint that creates attendance-class rows → accept a `client_id` and dedupe.** Unique index on `custom_client_id` catches online + offline race.
+10. **Never commit `dist/`, `*.apk`, `*.keystore`, or stale `.vue.js` artifacts.**
+11. **`bump-version.mjs` is the only way to bump `NATIVE_VERSION` / `NATIVE_VERSION_CODE`.** They stay in lockstep.
+12. **Maintenance window is 2:00–5:00 AM IST.** For same-day fixes, `supervisorctl signal QUIT` not `restart`.

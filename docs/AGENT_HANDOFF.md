@@ -2,7 +2,7 @@
 
 > **Start here if you're a fresh agent picking up this repo.**
 > Everything a new agent needs to ship a fix: infra creds, deploy flow,
-> demo data, known gotchas. Battle-tested as of **APK 1.0.20 / versionCode 21**.
+> demo data, known gotchas. Battle-tested as of **APK 1.0.22 / versionCode 23**.
 >
 > Visual tour of every screen: [`docs/screenshots/`](./screenshots/README.md).
 
@@ -53,7 +53,7 @@ frappe-bench/apps/fatehhr/
 
 | Thing                  | Value                                                               |
 |------------------------|---------------------------------------------------------------------|
-| Latest APK             | `fatehhr-demo-1.0.20.apk` (versionCode **21**)                      |
+| Latest APK             | `fatehhr-demo-1.0.22.apk` (versionCode **23**)                      |
 | PWA URL                | https://hr-demo.enfonoerp.com/fatehhr                               |
 | APK download           | https://github.com/EnfonoTech/fatehhr/releases/tag/frontend-dev    |
 | PWA tarball asset      | `fatehhr-dist.tar.gz` on the same release                           |
@@ -353,6 +353,51 @@ Then just `sed` the path in run_py.sh to point at each new script.
 
 ---
 
+## 7.5. Attendance mode + dedupe (1.0.22)
+
+Single DocType **Fateh HR Settings** holds `attendance_mode`. The client
+reads it via `fatehhr.api.settings.get_public` and caches in localStorage.
+
+| Mode | Big "Check In" button | Tasks timer | Where attendance comes from |
+|---|---|---|---|
+| **Checkin Based** (default) | Writes `Employee Checkin (IN/OUT)` directly. GPS + selfie captured. | Timesheet row ONLY. Server skips Checkin insert. | The button. |
+| **Timer Based** | Routes to task picker → calls `task.start_timer` → server writes IN + Timesheet. Check-Out calls `task.stop_timer` → OUT + closes row. | Same live `running` state as the button. Tapping Start on Tasks tab = tapping Check-In. | The timer. |
+
+**Why a toggle and not a merge**: payroll owners disagree on whether
+"attendance" means "did you show up" (button) or "what did you work on"
+(timer). Stacking both double-counts. The mode picks a single source.
+
+### Client-ID dedupe key
+
+Every checkin-writing endpoint now accepts `client_id` (UUID from the
+client). Stored on `Employee Checkin.custom_client_id` with a unique
+index. Online + offline-drain paths pass the SAME uuid. Server dedupes
+via SELECT then handles `DuplicateEntryError` on race.
+
+Files that mint the uuid:
+- `src/stores/checkin.ts :: submit()` (every Check-In/Out tap)
+- `src/stores/tasks.ts :: start()` / `stop()` (every timer Start/Stop)
+
+### `today_summary` for the home card
+
+`fatehhr.api.checkin.today_summary` pairs consecutive IN→OUT rows for
+today (site-local), sums seconds, returns `{worked_seconds, open_since}`.
+The client live-ticks when `open_since` is non-null.
+
+### Gotchas specific to this feature
+
+- Task timer `start_timer`/`stop_timer` MUST use `_parse_client_ts` not
+  `get_datetime` — the latter drops tz on ISO-with-Z (LESSONS §9). Fixed
+  in 1.0.22; watch for new timer-adjacent endpoints regressing it.
+- `custom_client_id` has `unique: 1` in the Custom Field fixture. If
+  fixture is re-imported without running migrate, the unique index might
+  not get added. Run `bench migrate` after any fixture edit that touches
+  `unique`.
+- Legacy checkin rows have `custom_client_id = NULL`. MariaDB's unique
+  index treats multiple NULLs as distinct, so historical data is fine.
+
+---
+
 ## 8. Testing loop
 
 ```bash
@@ -382,9 +427,13 @@ curl -s "https://hr-demo.enfonoerp.com/api/method/fatehhr.api.expense.expense_ty
 
 ## 9. Open / deferred items
 
-As of 1.0.20 these are pending user confirmation:
+As of 1.0.22 these are pending user confirmation:
 
 - [x] **Biometric unlock** alongside PIN — wired in 1.0.19/1.0.20 (`@capacitor-community/biometric-auth`). Toggle lives in More tab for users who already have a PIN.
+- [x] **Salary-safe dedupe** — `Employee Checkin.custom_client_id` unique (1.0.22). Online + offline drain cannot both materialise the same tap. Prevents attendance double-count → corrupt `payment_days`.
+- [x] **Attendance-mode toggle** — single DocType `Fateh HR Settings` → `attendance_mode` (`Checkin Based` | `Timer Based`). In Checkin mode, Timesheet-only timers; in Timer mode, Check-In button routes through a task picker.
+- [x] **Daily hours card on Home** — `fatehhr.api.checkin.today_summary` returns `{worked_seconds, open_since}`. Live-ticks when an IN is open.
+- [x] **Offline TZ regression (writes)** — `task.start_timer` / `stop_timer` now use `_parse_client_ts` instead of `get_datetime`, so ISO-with-Z stops dropping tz (was causing 4h drift on offline rows).
 - [ ] **"Keyboard not good when login saved"** — need user clarification on what's bad (autofill? keyboard type?).
 
 User has also occasionally reported:
