@@ -113,12 +113,27 @@ def _build_pairs(rows, for_date):
 
 
 def _autoclose(current_in, for_date):
+	"""Close an unpaired IN for display.
+
+	Past days: clamp at midnight (user must have walked off without
+	tapping OUT; counting to day-end is the only defensible estimate
+	without data).
+
+	Today: clamp at `now`. Otherwise the calendar projects the open pair
+	to midnight and the current day reads as ~24h worked, which
+	contradicts the live 'Worked today' card on Home (which matches
+	server `today_summary`, open IN counted only up to now).
+	"""
 	t_in = get_datetime(current_in["time"])
-	midnight = dt.datetime.combine(for_date + dt.timedelta(days=1), dt.time.min)
-	dur = (midnight - t_in).total_seconds() / 3600.0
+	today = dt.date.today()
+	if for_date >= today:
+		cap = dt.datetime.now()
+	else:
+		cap = dt.datetime.combine(for_date + dt.timedelta(days=1), dt.time.min)
+	dur = (cap - t_in).total_seconds() / 3600.0
 	return {
 		"in": _naive_site_to_utc_iso(t_in),
-		"out": _naive_site_to_utc_iso(midnight),
+		"out": _naive_site_to_utc_iso(cap),
 		"task": current_in.get("custom_task"),
 		"location": current_in.get("custom_location_address"),
 		"hours": round(max(dur, 0), 2),
