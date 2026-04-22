@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { taskApi, type TaskRow } from "@/api/task";
 import { saveItem } from "@/offline/queue";
 import { useSyncStore } from "@/stores/sync";
+import { useCheckinStore } from "@/stores/checkin";
 import { v4 as uuid } from "uuid";
 import { getCurrentCoords, hapticMedium } from "@/app/frappe";
 
@@ -82,6 +83,7 @@ export const useTasksStore = defineStore("tasks", {
             startedAt: timestamp,
           };
           localStorage.setItem(RUNNING_KEY, JSON.stringify(this.running));
+          this._syncCheckinStatus("IN", task);
           await hapticMedium();
           return { mode: "online" as const };
         } catch {
@@ -105,6 +107,7 @@ export const useTasksStore = defineStore("tasks", {
       );
       this.running = { clientSessionId, serverSessionId: null, task, startedAt: timestamp };
       localStorage.setItem(RUNNING_KEY, JSON.stringify(this.running));
+      this._syncCheckinStatus("IN", task);
       await hapticMedium();
       await sync.refresh();
       return { mode: "queued" as const };
@@ -128,6 +131,7 @@ export const useTasksStore = defineStore("tasks", {
             client_id: clientId,
           });
           await this.clearRunning();
+          this._syncCheckinStatus("OUT", null);
           await hapticMedium();
           return { mode: "online" as const };
         } catch {
@@ -155,6 +159,7 @@ export const useTasksStore = defineStore("tasks", {
         [],
       );
       await this.clearRunning();
+      this._syncCheckinStatus("OUT", null);
       await sync.refresh();
       return { mode: "queued" as const };
     },
@@ -162,6 +167,21 @@ export const useTasksStore = defineStore("tasks", {
     async clearRunning() {
       this.running = null;
       localStorage.removeItem(RUNNING_KEY);
+    },
+
+    // Keep the checkin store's "currentStatus" in lockstep with whatever
+    // the timer just did. Without this, Timer-Mode users would tap
+    // Check In / Check Out on the home screen (which reads currentStatus)
+    // and see the button stay stale until the next refreshToday fired.
+    _syncCheckinStatus(status: "IN" | "OUT", task: string | null) {
+      try {
+        const checkin = useCheckinStore();
+        checkin.currentStatus = status;
+        checkin.currentTask = task;
+        checkin._persist();
+      } catch {
+        /* checkin store not ready; next mount will reconcile */
+      }
     },
 
     elapsed(): string {

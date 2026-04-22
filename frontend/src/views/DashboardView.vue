@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from "vue";
+import { onMounted, onUnmounted, computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import SyncBar from "@/components/SyncBar.vue";
@@ -16,6 +16,7 @@ import { useCheckinStore } from "@/stores/checkin";
 import { useAnnouncementStore } from "@/stores/announcement";
 import { useNotificationStore } from "@/stores/notification";
 import { useSettingsStore } from "@/stores/settings";
+import { useSyncStore } from "@/stores/sync";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
 
 const { t } = useI18n();
@@ -26,6 +27,7 @@ const checkin = useCheckinStore();
 const ann = useAnnouncementStore();
 const notif = useNotificationStore();
 const settings = useSettingsStore();
+const sync = useSyncStore();
 
 // Daily hours — live-ticks when an IN has no matching OUT yet (open pair).
 const todaySummary = ref<TodaySummary>({ worked_seconds: 0, open_since: null });
@@ -120,19 +122,33 @@ function fmtTime(iso: string): string {
   });
 }
 
+async function pullAll() {
+  try { await checkin.refreshToday(); } catch { /* offline */ }
+  try { await checkin.loadHistory(1); } catch { /* offline */ }
+  await refreshWorked();
+}
+
 onMounted(async () => {
   await settings.refresh();
   await profile.load();
-  await checkin.refreshToday();
-  // Surface the last 3 check-ins on the home screen (bug #7).
-  // loadHistory swallows offline errors; queue-derived items get merged into
-  // the view on the checkin history page.
-  try { await checkin.loadHistory(1); } catch { /* offline */ }
+  await pullAll();
   await ann.load(session.user ?? "");
   await notif.load();
-  await refreshWorked();
   tickHandle = window.setInterval(() => (tickNow.value = Date.now()), 1000);
 });
+
+// When drain finishes (pending drops) or last sync bumps, pull fresh
+// state so the Home button and Worked card reflect what's on the server.
+// Without this the button used to stay on "Check Out" after an offline
+// OUT had synced in the background.
+watch(
+  () => [sync.pending, sync.lastSyncedAt, sync.status] as const,
+  async ([newPending, newLast], [oldPending, oldLast]) => {
+    if (newPending !== oldPending || newLast !== oldLast) {
+      await pullAll();
+    }
+  },
+);
 
 onUnmounted(() => {
   if (tickHandle) clearInterval(tickHandle);
