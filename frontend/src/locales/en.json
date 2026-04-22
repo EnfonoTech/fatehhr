@@ -33,7 +33,10 @@
     "currently_out": "You're not checked in.",
     "leave_balance": "Leave balance",
     "unread": "unread",
-    "latest_announcement": "Latest announcement"
+    "latest_announcement": "Latest announcement",
+    "worked_today": "Worked today",
+    "pick_task": "Pick a task",
+    "pick_task_hint": "Check-in is tied to a task in this mode. Select one to start your day."
   },
   "tasks": {
     "title": "Tasks",

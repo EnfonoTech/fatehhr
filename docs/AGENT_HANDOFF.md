@@ -2,7 +2,9 @@
 
 > **Start here if you're a fresh agent picking up this repo.**
 > Everything a new agent needs to ship a fix: infra creds, deploy flow,
-> demo data, known gotchas. Battle-tested as of **APK 1.0.14 / versionCode 15**.
+> demo data, known gotchas. Battle-tested as of **APK 1.0.20 / versionCode 21**.
+>
+> Visual tour of every screen: [`docs/screenshots/`](./screenshots/README.md).
 
 ---
 
@@ -51,7 +53,7 @@ frappe-bench/apps/fatehhr/
 
 | Thing                  | Value                                                               |
 |------------------------|---------------------------------------------------------------------|
-| Latest APK             | `fatehhr-demo-1.0.14.apk` (versionCode **15**)                      |
+| Latest APK             | `fatehhr-demo-1.0.20.apk` (versionCode **21**)                      |
 | PWA URL                | https://hr-demo.enfonoerp.com/fatehhr                               |
 | APK download           | https://github.com/EnfonoTech/fatehhr/releases/tag/frontend-dev    |
 | PWA tarball asset      | `fatehhr-dist.tar.gz` on the same release                           |
@@ -380,9 +382,9 @@ curl -s "https://hr-demo.enfonoerp.com/api/method/fatehhr.api.expense.expense_ty
 
 ## 9. Open / deferred items
 
-As of 1.0.14 these are pending user confirmation:
+As of 1.0.20 these are pending user confirmation:
 
-- [ ] **Biometric unlock** alongside PIN (`@capacitor-community/biometric-auth`). Not yet wired.
+- [x] **Biometric unlock** alongside PIN — wired in 1.0.19/1.0.20 (`@capacitor-community/biometric-auth`). Toggle lives in More tab for users who already have a PIN.
 - [ ] **"Keyboard not good when login saved"** — need user clarification on what's bad (autofill? keyboard type?).
 
 User has also occasionally reported:

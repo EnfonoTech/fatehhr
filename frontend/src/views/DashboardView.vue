@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from "vue";
+import { onMounted, onUnmounted, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import SyncBar from "@/components/SyncBar.vue";
@@ -15,6 +15,8 @@ import { useProfileStore } from "@/stores/profile";
 import { useCheckinStore } from "@/stores/checkin";
 import { useAnnouncementStore } from "@/stores/announcement";
 import { useNotificationStore } from "@/stores/notification";
+import { useSettingsStore } from "@/stores/settings";
+import { checkinApi, type TodaySummary } from "@/api/checkin";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -23,6 +25,34 @@ const profile = useProfileStore();
 const checkin = useCheckinStore();
 const ann = useAnnouncementStore();
 const notif = useNotificationStore();
+const settings = useSettingsStore();
+
+// Daily hours — live-ticks when an IN has no matching OUT yet (open pair).
+const todaySummary = ref<TodaySummary>({ worked_seconds: 0, open_since: null });
+const tickNow = ref(Date.now());
+let tickHandle: number | null = null;
+
+const workedLabel = computed(() => {
+  let secs = todaySummary.value.worked_seconds;
+  if (todaySummary.value.open_since) {
+    // Live part: seconds since the open IN, added to the completed-pair base.
+    const since = Date.parse(todaySummary.value.open_since);
+    if (!Number.isNaN(since)) {
+      secs += Math.max(0, Math.floor((tickNow.value - since) / 1000));
+    }
+  }
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+});
+
+async function refreshWorked() {
+  try {
+    todaySummary.value = await checkinApi.todaySummary();
+  } catch {
+    /* offline — keep last value */
+  }
+}
 
 const greetingKey = computed<
   "dashboard.greeting_morning" | "dashboard.greeting_afternoon" | "dashboard.greeting_evening"
@@ -51,6 +81,7 @@ function fmtTime(iso: string): string {
 }
 
 onMounted(async () => {
+  await settings.refresh();
   await profile.load();
   await checkin.refreshToday();
   // Surface the last 3 check-ins on the home screen (bug #7).
@@ -59,6 +90,12 @@ onMounted(async () => {
   try { await checkin.loadHistory(1); } catch { /* offline */ }
   await ann.load(session.user ?? "");
   await notif.load();
+  await refreshWorked();
+  tickHandle = window.setInterval(() => (tickNow.value = Date.now()), 1000);
+});
+
+onUnmounted(() => {
+  if (tickHandle) clearInterval(tickHandle);
 });
 </script>
 
@@ -82,6 +119,12 @@ onMounted(async () => {
         {{ checkin.currentStatus === 'IN' ? t('checkin.check_out') : t('checkin.check_in') }}
       </AppButton>
     </HeroCard>
+
+    <div class="dash__hours" :class="{ 'is-live': todaySummary.open_since }">
+      <span class="dash__hours-label">{{ t('dashboard.worked_today') }}</span>
+      <span class="dash__hours-value">{{ workedLabel }}</span>
+      <span v-if="todaySummary.open_since" class="dash__hours-pulse" aria-hidden="true"></span>
+    </div>
 
     <QuickActionGrid :items="quickActions" />
 
@@ -144,6 +187,35 @@ onMounted(async () => {
 }
 [dir="rtl"] .dashboard__greeting { font-family: var(--font-display-ar); font-weight: 500; }
 .dash__today-status { margin: 0 0 10px; color: var(--ink-secondary); font-size: 13px; }
+
+.dash__hours {
+  background: var(--bg-surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e-1);
+  padding: 12px 14px;
+  display: flex; align-items: baseline; gap: 10px;
+  position: relative;
+}
+.dash__hours-label {
+  font-size: 12px; color: var(--ink-secondary); letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dash__hours-value {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 500;
+  color: var(--ink-primary); margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.dash__hours-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success, #2a6b3a);
+  box-shadow: 0 0 0 0 rgba(42, 107, 58, 0.5);
+  animation: dash-pulse 1.8s ease-in-out infinite;
+  align-self: center;
+}
+@keyframes dash-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(42, 107, 58, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(42, 107, 58, 0); }
+}
 
 .dash__recent {
   background: var(--bg-surface); border-radius: var(--r-lg); box-shadow: var(--e-1);

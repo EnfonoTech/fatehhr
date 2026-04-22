@@ -15,6 +15,7 @@ async function getSessionMapping(clientId: string): Promise<string | null> {
 registerProcessor("task_timer_start", async (entry: QueueRecord) => {
   const p = entry.payload as {
     clientSessionId: string;
+    clientId?: string;
     task: string;
     latitude: number | null;
     longitude: number | null;
@@ -27,6 +28,7 @@ registerProcessor("task_timer_start", async (entry: QueueRecord) => {
     longitude: p.longitude,
     address: p.address,
     timestamp: p.timestamp,
+    client_id: p.clientId,
   });
   await setSessionMapping(p.clientSessionId, r.session_id);
 });
@@ -34,6 +36,7 @@ registerProcessor("task_timer_start", async (entry: QueueRecord) => {
 registerProcessor("task_timer_stop", async (entry: QueueRecord) => {
   const p = entry.payload as {
     clientSessionId: string;
+    clientId?: string;
     latitude: number | null;
     longitude: number | null;
     address: string | null;
@@ -49,5 +52,6 @@ registerProcessor("task_timer_stop", async (entry: QueueRecord) => {
     longitude: p.longitude,
     address: p.address,
     timestamp: p.timestamp,
+    client_id: p.clientId,
   });
 });

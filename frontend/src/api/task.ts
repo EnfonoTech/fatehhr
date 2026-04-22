@@ -20,10 +20,11 @@ export const taskApi = {
     longitude: number | null;
     address: string | null;
     timestamp: string;
+    client_id?: string;
   }) =>
     apiCall<{
       session_id: string;
-      checkin_name: string;
+      checkin_name: string | null;
       timesheet: string;
       custom_geofence_status: string;
     }>("POST", "fatehhr.api.task.start_timer", p),
@@ -33,10 +34,11 @@ export const taskApi = {
     longitude: number | null;
     address: string | null;
     timestamp: string;
+    client_id?: string;
   }) =>
     apiCall<{
       session_id: string;
-      checkin_out_name: string;
+      checkin_out_name: string | null;
       timesheet: string;
       hours: number;
     }>("POST", "fatehhr.api.task.stop_timer", p),

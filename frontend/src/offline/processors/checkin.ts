@@ -12,6 +12,7 @@ interface CheckinPayload {
   selfie_photo_id?: string | null;
   selfie_file_url?: string | null;
   timestamp: string;
+  client_id?: string;
 }
 
 registerProcessor("checkin", async (entry: QueueRecord) => {
@@ -30,5 +31,6 @@ registerProcessor("checkin", async (entry: QueueRecord) => {
     task: p.task,
     selfie_file_url,
     timestamp: p.timestamp,
+    client_id: p.client_id,
   });
 });

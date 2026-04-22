@@ -15,6 +15,12 @@ export interface CheckinRow {
   __pending?: boolean;
 }
 
+export interface TodaySummary {
+  worked_seconds: number;
+  /** ISO-UTC of the last open IN (no matching OUT yet). null = no open pair. */
+  open_since: string | null;
+}
+
 export const checkinApi = {
   create: (p: {
     log_type: "IN" | "OUT";
@@ -24,8 +30,12 @@ export const checkinApi = {
     task: string | null;
     selfie_file_url?: string | null;
     timestamp: string;
+    client_id?: string;
   }) => apiCall<CheckinRow>("POST", "fatehhr.api.checkin.create", p),
 
   list: (p: { from_date?: string; to_date?: string; page?: number; page_size?: number }) =>
     apiCall<CheckinRow[]>("POST", "fatehhr.api.checkin.list_mine", p),
+
+  todaySummary: () =>
+    apiCall<TodaySummary>("POST", "fatehhr.api.checkin.today_summary", {}),
 };

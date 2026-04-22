@@ -115,6 +115,11 @@ export const useCheckinStore = defineStore("checkin", {
       const sync = useSyncStore();
       const timestamp = new Date().toISOString();
       const sessionId = uuid();
+      // client_id is the dedupe key the server uses. Same uuid flows through
+      // the online call AND the offline queue payload, so if both paths race
+      // the server can drop the second write on a unique-index violation
+      // instead of producing two Attendance rows.
+      const clientId = uuid();
       const logicalKey = `checkin:${sessionId}`;
       const effectiveImages = payload.selfie_photo_id ? [payload.selfie_photo_id] : [];
 
@@ -132,6 +137,7 @@ export const useCheckinStore = defineStore("checkin", {
             task: payload.task,
             selfie_file_url,
             timestamp,
+            client_id: clientId,
           });
           this.currentStatus = row.log_type;
           this.currentTask = row.custom_task;
@@ -151,6 +157,7 @@ export const useCheckinStore = defineStore("checkin", {
         task: payload.task,
         selfie_photo_id: payload.selfie_photo_id,
         timestamp,
+        client_id: clientId,
       }, effectiveImages);
 
       this.currentStatus = payload.log_type;

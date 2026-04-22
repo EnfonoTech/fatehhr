@@ -43,6 +43,8 @@ export const useTasksStore = defineStore("tasks", {
       const coords = await getCurrentCoords();
       const timestamp = new Date().toISOString();
       const clientSessionId = uuid();
+      // Shared dedupe key across online + offline drain for Timer-mode Checkin.
+      const clientId = uuid();
 
       if (sync.isOnline) {
         try {
@@ -52,6 +54,7 @@ export const useTasksStore = defineStore("tasks", {
             longitude: coords?.longitude ?? null,
             address: null,
             timestamp,
+            client_id: clientId,
           });
           this.running = {
             clientSessionId,
@@ -72,6 +75,7 @@ export const useTasksStore = defineStore("tasks", {
         `start:${clientSessionId}`,
         {
           clientSessionId,
+          clientId,
           task,
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
@@ -92,6 +96,7 @@ export const useTasksStore = defineStore("tasks", {
       const sync = useSyncStore();
       const coords = await getCurrentCoords();
       const timestamp = new Date().toISOString();
+      const clientId = uuid();
 
       if (sync.isOnline && this.running.serverSessionId) {
         try {
@@ -101,6 +106,7 @@ export const useTasksStore = defineStore("tasks", {
             longitude: coords?.longitude ?? null,
             address: null,
             timestamp,
+            client_id: clientId,
           });
           await this.clearRunning();
           await hapticMedium();
@@ -115,6 +121,7 @@ export const useTasksStore = defineStore("tasks", {
         `stop:${this.running.clientSessionId}`,
         {
           clientSessionId: this.running.clientSessionId,
+          clientId,
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,
           address: null,
