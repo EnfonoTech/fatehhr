@@ -13,10 +13,23 @@ interface RunningTimer {
 }
 
 const RUNNING_KEY = "fatehhr.runningTimer";
+const TASKS_CACHE_KEY = "fatehhr.tasksCache";
+
+function readTasksCache(): TaskRow[] {
+  try {
+    const raw = localStorage.getItem(TASKS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as TaskRow[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export const useTasksStore = defineStore("tasks", {
   state: () => ({
-    tasks: [] as TaskRow[],
+    // Seed from localStorage so the Tasks tab and Check-In task picker
+    // show something immediately on cold start / offline. Refreshes from
+    // server when online in `load()`.
+    tasks: readTasksCache(),
     running: null as RunningTimer | null,
   }),
   actions: {
@@ -32,9 +45,15 @@ export const useTasksStore = defineStore("tasks", {
         }
       }
       try {
-        this.tasks = await taskApi.list_mine();
+        const fresh = await taskApi.list_mine();
+        this.tasks = fresh;
+        try {
+          localStorage.setItem(TASKS_CACHE_KEY, JSON.stringify(fresh));
+        } catch {
+          /* storage full / disabled — keep in-memory */
+        }
       } catch {
-        /* offline */
+        // Offline: keep whatever we hydrated from cache in state().
       }
     },
 
@@ -121,6 +140,12 @@ export const useTasksStore = defineStore("tasks", {
         `stop:${this.running.clientSessionId}`,
         {
           clientSessionId: this.running.clientSessionId,
+          // If the start was online, we know the server session id already.
+          // Pass it through so the stop processor doesn't need to look it up
+          // in the client→server mapping (which is only written for offline
+          // starts). Without this, "online start → offline stop" got stuck
+          // on "Session start not yet drained" forever.
+          serverSessionId: this.running.serverSessionId,
           clientId,
           latitude: coords?.latitude ?? null,
           longitude: coords?.longitude ?? null,

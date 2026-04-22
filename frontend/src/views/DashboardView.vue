@@ -46,11 +46,51 @@ const workedLabel = computed(() => {
   return `${h}h ${String(m).padStart(2, "0")}m`;
 });
 
+function computeLocalSummary(): TodaySummary {
+  // Mirror the server's greedy IN→OUT pair walk, using today's rows from
+  // the Pinia checkin store. `checkin.history` already merges
+  // queued-offline rows with server rows, so this gives a sensible value
+  // even when the /today_summary endpoint can't be reached.
+  const nowStart = new Date();
+  const y = nowStart.getFullYear();
+  const m = nowStart.getMonth();
+  const d = nowStart.getDate();
+  const todayLocal = (iso: string) => {
+    const dt = new Date(iso.replace(" ", "T"));
+    return dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d;
+  };
+  // Sort ASC for pairing.
+  const rows = [...checkin.history]
+    .filter((r) => r.time && todayLocal(r.time))
+    .sort((a, b) => (a.time < b.time ? -1 : 1));
+  let total = 0;
+  let openFrom: string | null = null;
+  for (const r of rows) {
+    if (r.log_type === "IN") {
+      openFrom = r.time;
+    } else if (r.log_type === "OUT" && openFrom) {
+      const s = Math.max(
+        0,
+        Math.floor(
+          (Date.parse(r.time.replace(" ", "T")) -
+            Date.parse(openFrom.replace(" ", "T"))) /
+            1000,
+        ),
+      );
+      total += s;
+      openFrom = null;
+    }
+  }
+  return { worked_seconds: total, open_since: openFrom };
+}
+
 async function refreshWorked() {
   try {
     todaySummary.value = await checkinApi.todaySummary();
   } catch {
-    /* offline — keep last value */
+    // Offline — fall back to a local computation from the checkin history
+    // slice (which already merges queued offline rows).
+    todaySummary.value = computeLocalSummary();
   }
 }
 

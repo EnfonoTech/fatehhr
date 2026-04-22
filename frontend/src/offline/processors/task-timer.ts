@@ -36,13 +36,17 @@ registerProcessor("task_timer_start", async (entry: QueueRecord) => {
 registerProcessor("task_timer_stop", async (entry: QueueRecord) => {
   const p = entry.payload as {
     clientSessionId: string;
+    serverSessionId?: string | null;
     clientId?: string;
     latitude: number | null;
     longitude: number | null;
     address: string | null;
     timestamp: string;
   };
-  const serverId = await getSessionMapping(p.clientSessionId);
+  // Prefer the serverSessionId the client had at stop-time (online start,
+  // offline stop). Fall back to the idb mapping (offline start → offline
+  // stop, populated once the start processor drains).
+  const serverId = p.serverSessionId || (await getSessionMapping(p.clientSessionId));
   if (!serverId) {
     throw new Error("Session start not yet drained; will retry next drain cycle.");
   }
