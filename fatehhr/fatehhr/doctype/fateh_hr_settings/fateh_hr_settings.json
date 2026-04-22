@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "creation": "2026-04-22 12:00:00",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "attendance_section",
+  "attendance_mode",
+  "mode_explainer",
+  "column_break_1",
+  "default_task_required_section",
+  "default_task_required_html"
+ ],
+ "fields": [
+  {"fieldname": "attendance_section", "fieldtype": "Section Break", "label": "Attendance"},
+  {"fieldname": "attendance_mode", "fieldtype": "Select", "label": "Attendance Mode", "options": "Checkin Based\nTimer Based", "default": "Checkin Based", "reqd": 1, "description": "How the mobile app records attendance for payroll."},
+  {"fieldname": "mode_explainer", "fieldtype": "HTML", "options": "<div style='padding:12px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;line-height:1.55'><b>Checkin Based</b> &mdash; the big <i>Check In</i> / <i>Check Out</i> button captures GPS + selfie and writes an <code>Employee Checkin</code> row. Task timers (Tasks tab) only write <code>Timesheet</code> entries &mdash; they do <u>not</u> create checkin rows, so attendance is never double-counted.<br><br><b>Timer Based</b> &mdash; the <i>Check In</i> button first asks which task the user is starting. Starting a task writes <code>Employee Checkin (IN)</code> + opens a <code>Timesheet</code> row. Stopping the task writes <code>Employee Checkin (OUT)</code> + closes the row. The Tasks tab and Check-in button share one live timer.<br><br>Payroll reads <code>Employee Checkin</code> rows &rarr; auto-Attendance &rarr; <code>payment_days</code> on Salary Slip. Choose the mode that matches how your team works.</div>"},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "default_task_required_section", "fieldtype": "Section Break", "label": "Timer Mode Prerequisites"},
+  {"fieldname": "default_task_required_html", "fieldtype": "HTML", "options": "<div style='padding:12px;border:1px solid #e5e5e5;border-radius:8px;line-height:1.55'>In <b>Timer Based</b> mode, every employee must have at least one open <code>Task</code> assigned (status = Open / Working, <code>_assign</code> contains the user). If not, the Check-in button will show an error asking them to contact HR.</div>"}
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-22 12:00:00",
+ "modified_by": "Administrator",
+ "module": "Fatehhr",
+ "name": "Fateh HR Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "share": 1, "print": 1},
+  {"role": "HR Manager", "read": 1, "write": 1, "create": 1, "share": 1, "print": 1},
+  {"role": "Employee", "read": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -90,6 +90,20 @@
   },
   {
     "doctype": "Custom Field",
+    "name": "Employee Checkin-custom_client_id",
+    "dt": "Employee Checkin",
+    "fieldname": "custom_client_id",
+    "label": "Client ID",
+    "fieldtype": "Data",
+    "insert_after": "custom_geofence_status",
+    "module": "Fatehhr",
+    "unique": 1,
+    "no_copy": 1,
+    "read_only": 1,
+    "description": "Client-generated UUID per tap. Server dedupes online + offline drain using this."
+  },
+  {
+    "doctype": "Custom Field",
     "name": "Task-custom_latitude",
     "dt": "Task",
     "fieldname": "custom_latitude",

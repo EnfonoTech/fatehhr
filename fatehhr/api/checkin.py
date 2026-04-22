@@ -65,12 +65,19 @@ def create(
 	task: str | None = None,
 	selfie_file_url: str | None = None,
 	timestamp: str | None = None,
+	client_id: str | None = None,
 ) -> dict:
 	"""Create an Employee Checkin (IN/OUT) with optional GPS + task + selfie.
 
 	`timestamp`, if provided, is the queued ISO time from the client — used
 	ONLY as the `time` field. It is NEVER propagated as `client_modified`
 	(frappe-vue-pwa §4.5).
+
+	`client_id` is a UUID the client mints at the moment of the tap. The
+	server stores it on `custom_client_id` with a unique index so the
+	online call + offline queue drain cannot both materialise the same tap
+	into two attendance rows (which would corrupt payroll via
+	auto-Attendance → `payment_days`).
 	"""
 	if log_type not in ("IN", "OUT"):
 		frappe.throw(frappe._("log_type must be IN or OUT"))
@@ -78,6 +85,19 @@ def create(
 	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 	if not employee:
 		frappe.throw(frappe._("No Employee linked to this user."))
+
+	# Dedupe by client_id BEFORE work — if the client already managed to
+	# write this tap (e.g. an earlier partial network attempt succeeded),
+	# return the existing row so the caller can settle its UI without
+	# creating a duplicate.
+	if client_id:
+		existing_name = frappe.db.get_value(
+			"Employee Checkin",
+			{"custom_client_id": client_id, "employee": employee},
+			"name",
+		)
+		if existing_name:
+			return _row_as_response(existing_name)
 
 	t_lat = t_lng = t_rad = None
 	if task:
@@ -99,9 +119,23 @@ def create(
 		"custom_task": task or None,
 		"custom_selfie": selfie_file_url or None,
 		"custom_geofence_status": gf_status,
+		"custom_client_id": client_id or None,
 	})
 	doc.flags.ignore_permissions = False
-	doc.insert()
+	try:
+		doc.insert()
+	except frappe.exceptions.DuplicateEntryError:
+		# Race: another worker (drain) won. Return whatever they wrote.
+		frappe.db.rollback()
+		if client_id:
+			existing_name = frappe.db.get_value(
+				"Employee Checkin",
+				{"custom_client_id": client_id, "employee": employee},
+				"name",
+			)
+			if existing_name:
+				return _row_as_response(existing_name)
+		raise
 
 	# Frappe's ORM formats datetime as "YYYY-MM-DD HH:MM:SS" on insert, so the
 	# datetime(6) column drops microseconds — two IN/OUT taps within the same
@@ -127,6 +161,61 @@ def create(
 		"custom_location_address": address,
 		"custom_selfie": selfie_file_url,
 		"custom_geofence_status": gf_status,
+	}
+
+
+def _row_as_response(name: str) -> dict:
+	r = frappe.db.get_value(
+		"Employee Checkin", name,
+		[
+			"name", "log_type", "time",
+			"custom_task", "custom_latitude", "custom_longitude",
+			"custom_location_address", "custom_selfie", "custom_geofence_status",
+		],
+		as_dict=True,
+	) or {}
+	if r.get("time"):
+		r["time"] = _naive_site_to_utc_iso(r["time"])
+	return r
+
+
+@frappe.whitelist()
+def today_summary() -> dict:
+	"""Return today's worked seconds + open_since for the home screen.
+
+	Pairs consecutive IN→OUT rows for today. If the last row is an open IN
+	(no matching OUT yet), `open_since` is its ISO timestamp and the client
+	can live-tick the card. If the last row is OUT (or no rows), the total
+	is frozen.
+	"""
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if not employee:
+		return {"worked_seconds": 0, "open_since": None}
+
+	from frappe.utils import today
+	rows = frappe.db.sql(
+		"""
+		SELECT log_type, time
+		FROM `tabEmployee Checkin`
+		WHERE employee=%s AND DATE(time)=%s
+		ORDER BY time ASC
+		""",
+		(employee, today()),
+		as_dict=True,
+	)
+
+	total = 0
+	open_from = None
+	for r in rows:
+		if r["log_type"] == "IN":
+			open_from = r["time"]
+		elif r["log_type"] == "OUT" and open_from is not None:
+			total += max(0, (r["time"] - open_from).total_seconds())
+			open_from = None
+
+	return {
+		"worked_seconds": int(total),
+		"open_since": _naive_site_to_utc_iso(open_from) if open_from else None,
 	}
 
 
