@@ -115,6 +115,7 @@
     "empty": "لا توجد أخطاء.",
     "retry": "إعادة المحاولة",
     "delete_one": "حذف",
+    "confirm_delete": "اضغط مرة أخرى للتأكيد",
     "type_delete": "اكتب DELETE للتأكيد."
   },
   "nav": {

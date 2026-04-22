@@ -15,6 +15,11 @@ const { t } = useI18n();
 const router = useRouter();
 const sync = useSyncStore();
 const rows = ref<QueueRecord[]>([]);
+// id of the row awaiting a confirm tap. Android WebView silently drops
+// window.prompt / window.confirm, so we implement the two-tap pattern
+// inline: first tap flips the button to "Tap again to confirm", second
+// tap actually deletes. Avoids the `prompt` returning null trap.
+const pendingDelete = ref<string | null>(null);
 
 async function refresh() {
   rows.value = (await listPending()).filter((r) => r.lastError);
@@ -23,13 +28,24 @@ onMounted(refresh);
 
 async function retry() {
   await sync.triggerDrain();
+  await sync.refresh();
   await refresh();
 }
 
 async function deleteOne(id: string) {
-  const typed = prompt(t("sync_errors.type_delete"));
-  if (typed !== "DELETE") return;
+  if (pendingDelete.value !== id) {
+    pendingDelete.value = id;
+    // Auto-cancel the armed state after 4s so a stray first tap doesn't
+    // leave the destructive button hot indefinitely.
+    window.setTimeout(() => {
+      if (pendingDelete.value === id) pendingDelete.value = null;
+    }, 4000);
+    return;
+  }
+  pendingDelete.value = null;
   await removeEntry(id);
+  // Re-pull sync store so the top bar badge updates immediately.
+  await sync.refresh();
   await refresh();
 }
 </script>
@@ -48,7 +64,12 @@ async function deleteOne(id: string) {
         <p class="syncerr__msg">{{ r.lastError?.message }}</p>
         <div class="syncerr__actions">
           <AppButton variant="ghost" @click="retry">{{ t('sync_errors.retry') }}</AppButton>
-          <AppButton variant="destructive" @click="deleteOne(r.id)">{{ t('sync_errors.delete_one') }}</AppButton>
+          <AppButton
+            variant="destructive"
+            @click="deleteOne(r.id)"
+          >
+            {{ pendingDelete === r.id ? t('sync_errors.confirm_delete') : t('sync_errors.delete_one') }}
+          </AppButton>
         </div>
       </li>
     </ul>

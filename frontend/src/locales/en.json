@@ -205,6 +205,7 @@
     "empty": "No sync errors.",
     "retry": "Retry",
     "delete_one": "Delete",
+    "confirm_delete": "Tap again to confirm",
     "type_delete": "Type DELETE to confirm."
   },
   "nav": {
