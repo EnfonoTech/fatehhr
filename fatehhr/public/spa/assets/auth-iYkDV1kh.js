@@ -1,0 +1,1 @@
+import{z as h}from"./index-BnBuSLFj.js";const e={login:(a,i)=>h("POST","fatehhr.api.auth.login",{usr:a,pwd:i}),setPin:a=>h("POST","fatehhr.api.auth.set_pin",{pin:a}),verifyPin:(a,i)=>h("POST","fatehhr.api.auth.verify_pin",{user:a,pin:i}),changePin:(a,i)=>h("POST","fatehhr.api.auth.change_pin",{old_pin:a,new_pin:i})};export{e as a};
