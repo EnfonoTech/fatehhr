@@ -10,6 +10,7 @@ export interface CheckinRow {
   custom_location_address: string | null;
   custom_selfie: string | null;
   custom_geofence_status: "disabled" | "inside" | "outside" | "unknown";
+  activity_log?: string | null;
   employee_user?: string;
   /** Local marker — true for queued offline rows that aren't on the server yet. */
   __pending?: boolean;
@@ -31,6 +32,7 @@ export const checkinApi = {
     selfie_file_url?: string | null;
     timestamp: string;
     client_id?: string;
+    activity_log?: string | null;
   }) => apiCall<CheckinRow>("POST", "fatehhr.api.checkin.create", p),
 
   list: (p: { from_date?: string; to_date?: string; page?: number; page_size?: number }) =>

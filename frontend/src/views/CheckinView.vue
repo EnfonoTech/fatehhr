@@ -26,6 +26,7 @@ const lng = ref<number | null>(null);
 const address = ref<string | null>(null);
 const task = ref<string | null>(null);
 const selfiePhotoId = ref<string | null>(null);
+const activityLog = ref<string | null>(null);
 const busy = ref(false);
 const message = ref<string | null>(null);
 const geofence = ref<"disabled" | "inside" | "outside" | "unknown">("unknown");
@@ -112,6 +113,7 @@ async function submitCheckinMode() {
       address: address.value,
       task: task.value,
       selfie_photo_id: selfiePhotoId.value,
+      activity_log: nextLogType.value === "OUT" ? activityLog.value : null,
     });
     await hapticMedium();
     message.value = res.mode === "online" ? t("checkin.done") : t("checkin.queued");
@@ -119,6 +121,7 @@ async function submitCheckinMode() {
       geofence.value = res.row.custom_geofence_status;
     }
     selfiePhotoId.value = null;
+    activityLog.value = null;
     window.setTimeout(() => {
       if (router.currentRoute.value.name === "checkin") {
         router.replace("/");
@@ -197,6 +200,17 @@ async function submitTimerMode() {
       {{ t(`checkin.geofence.${geofence}`) }}
     </p>
 
+    <section v-if="!timerMode && nextLogType === 'OUT'" class="checkin__activity">
+      <h3>{{ t('checkin.activity_log') }}</h3>
+      <p class="checkin__activity-hint">{{ t('checkin.activity_hint') }}</p>
+      <textarea
+        v-model="activityLog"
+        class="checkin__activity-input"
+        rows="4"
+        :placeholder="t('checkin.activity_placeholder')"
+      ></textarea>
+    </section>
+
     <section v-if="timerMode && nextLogType === 'IN'" class="checkin__pick">
       <h3>{{ t('dashboard.pick_task') }}</h3>
       <p class="checkin__pick-hint">{{ t('dashboard.pick_task_hint') }}</p>
@@ -257,6 +271,22 @@ async function submitTimerMode() {
 .checkin__selfie h3 {
   font-family: var(--font-display); font-size: 17px;
   margin: 16px 0 8px; font-weight: 400;
+}
+.checkin__activity h3 {
+  font-family: var(--font-display); font-size: 17px;
+  margin: 16px 0 4px; font-weight: 400;
+}
+.checkin__activity-hint {
+  color: var(--ink-secondary); font-size: 13px; margin: 0 0 8px;
+}
+.checkin__activity-input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  padding: 10px 12px; font: inherit; color: var(--ink-primary);
+  background: var(--bg-surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.checkin__activity-input:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .checkin__msg { color: var(--ink-secondary); font-size: 13px; margin: 8px 0 0; text-align: center; }
 .checkin__history-link {
