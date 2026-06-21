@@ -31,6 +31,9 @@ const PARENT_BY_ROUTE_NAME: Record<string, string> = {
   "leave": "/",
   "leave.apply": "/leave",
   "leave.list": "/leave",
+  // Approvals (cooperheat)
+  "approvals": "/",
+  "approvals.detail": "/approvals",
   // Expense
   "expense": "/",
   "expense.new": "/expense",

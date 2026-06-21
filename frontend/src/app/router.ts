@@ -15,6 +15,8 @@ const routes: RouteRecordRaw[] = [
       { path: "leave", name: "leave", component: () => import("@/views/LeaveHubView.vue") },
       { path: "leave/apply", name: "leave.apply", component: () => import("@/views/LeaveApplyView.vue") },
       { path: "leave/mine", name: "leave.list", component: () => import("@/views/LeaveListView.vue") },
+      { path: "approvals", name: "approvals", component: () => import("@/views/AttendanceApprovalsView.vue") },
+      { path: "approvals/:name", name: "approvals.detail", component: () => import("@/views/AttendanceApprovalDetailView.vue") },
       { path: "expense", name: "expense", component: () => import("@/views/ExpenseListView.vue") },
       { path: "expense/new", name: "expense.new", component: () => import("@/views/ExpenseClaimView.vue") },
       { path: "expense/mine", redirect: "/expense" },

@@ -11,6 +11,7 @@ import Icon from "@/components/Icon.vue";
 import { useProfileStore } from "@/stores/profile";
 import { useSessionStore } from "@/stores/session";
 import { setLocale } from "@/app/i18n";
+import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 import {
   getBiometricInfo,
   enrollBiometric,
@@ -104,6 +105,16 @@ async function logout() {
 
     <!-- Shortcuts -->
     <Card class="more__section more__links">
+      <button
+        v-if="CUSTOMER_APPROVALS_ENABLED && p?.is_approver"
+        class="more__link-btn"
+        type="button"
+        @click="router.push('/approvals')"
+      >
+        <span class="more__link-leading"><Icon name="approvals" :size="18" /></span>
+        <span class="more__link-label">{{ t('approvals.title') }}</span>
+        <Icon name="chevron-right" :size="18" class="more__link-chev" />
+      </button>
       <button class="more__link-btn" type="button" @click="router.push('/payslip')">
         <span class="more__link-leading"><Icon name="payslip" :size="18" /></span>
         <span class="more__link-label">{{ t('payslip.title') }}</span>

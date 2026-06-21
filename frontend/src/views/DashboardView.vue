@@ -17,7 +17,9 @@ import { useAnnouncementStore } from "@/stores/announcement";
 import { useNotificationStore } from "@/stores/notification";
 import { useSettingsStore } from "@/stores/settings";
 import { useSyncStore } from "@/stores/sync";
+import { useApprovalsStore } from "@/stores/approvals";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
+import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -28,6 +30,7 @@ const ann = useAnnouncementStore();
 const notif = useNotificationStore();
 const settings = useSettingsStore();
 const sync = useSyncStore();
+const approvals = useApprovalsStore();
 
 // Daily hours — live-ticks when an IN has no matching OUT yet (open pair).
 const todaySummary = ref<TodaySummary>({ worked_seconds: 0, open_since: null });
@@ -105,12 +108,25 @@ const greetingKey = computed<
   return "dashboard.greeting_evening";
 });
 
-const quickActions = computed(() => [
-  { to: "/leave", label: t("nav.leave"), icon: "leave" as const },
-  { to: "/expense", label: t("expense.title"), icon: "receipt" as const },
-  { to: "/tasks", label: t("tasks.title"), icon: "tasks" as const },
-  { to: "/payslip", label: t("payslip.title"), icon: "payslip" as const },
-]);
+const quickActions = computed(() => {
+  const items: { to: string; label: string; icon: "leave" | "receipt" | "tasks" | "payslip" | "approvals"; badge?: number }[] = [];
+  // Cooperheat: approvers get a Pending-Approvals tile with a live badge.
+  if (CUSTOMER_APPROVALS_ENABLED && profile.profile?.is_approver) {
+    items.push({
+      to: "/approvals",
+      label: t("approvals.title"),
+      icon: "approvals",
+      badge: approvals.summary.pending_count || undefined,
+    });
+  }
+  items.push(
+    { to: "/leave", label: t("nav.leave"), icon: "leave" },
+    { to: "/expense", label: t("expense.title"), icon: "receipt" },
+    { to: "/tasks", label: t("tasks.title"), icon: "tasks" },
+    { to: "/payslip", label: t("payslip.title"), icon: "payslip" },
+  );
+  return items;
+});
 
 const recentCheckins = computed(() => checkin.history.slice(0, 3));
 
@@ -131,6 +147,7 @@ async function pullAll() {
 onMounted(async () => {
   await settings.refresh();
   await profile.load();
+  if (CUSTOMER_APPROVALS_ENABLED) await approvals.loadSummary();
   await pullAll();
   await ann.load(session.user ?? "");
   await notif.load();

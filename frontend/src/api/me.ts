@@ -14,6 +14,8 @@ export interface Profile {
   bank_name?: string;
   bank_ac_no?: string;
   iban?: string;
+  /** Cooperheat: true if this user is an attendance approver. */
+  is_approver?: boolean;
 }
 
 export const meApi = {
