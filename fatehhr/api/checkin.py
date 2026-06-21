@@ -66,6 +66,7 @@ def create(
 	selfie_file_url: str | None = None,
 	timestamp: str | None = None,
 	client_id: str | None = None,
+	activity_log: str | None = None,
 ) -> dict:
 	"""Create an Employee Checkin (IN/OUT) with optional GPS + task + selfie.
 
@@ -121,6 +122,11 @@ def create(
 		"custom_geofence_status": gf_status,
 		"custom_client_id": client_id or None,
 	})
+	# Daily activity log is a cooperheat-owned field on Employee Checkin, shown
+	# only on check-OUT. Write it only when the field exists (absent on demo)
+	# and only for OUT, so this stays a no-op on tenants without cooperheat.
+	if log_type == "OUT" and activity_log and frappe.get_meta("Employee Checkin").has_field("activity_log"):
+		doc.activity_log = activity_log
 	doc.flags.ignore_permissions = False
 	try:
 		doc.insert()
@@ -161,19 +167,19 @@ def create(
 		"custom_location_address": address,
 		"custom_selfie": selfie_file_url,
 		"custom_geofence_status": gf_status,
+		"activity_log": activity_log,
 	}
 
 
 def _row_as_response(name: str) -> dict:
-	r = frappe.db.get_value(
-		"Employee Checkin", name,
-		[
-			"name", "log_type", "time",
-			"custom_task", "custom_latitude", "custom_longitude",
-			"custom_location_address", "custom_selfie", "custom_geofence_status",
-		],
-		as_dict=True,
-	) or {}
+	fields = [
+		"name", "log_type", "time",
+		"custom_task", "custom_latitude", "custom_longitude",
+		"custom_location_address", "custom_selfie", "custom_geofence_status",
+	]
+	if frappe.get_meta("Employee Checkin").has_field("activity_log"):
+		fields.append("activity_log")
+	r = frappe.db.get_value("Employee Checkin", name, fields, as_dict=True) or {}
 	if r.get("time"):
 		r["time"] = _naive_site_to_utc_iso(r["time"])
 	return r

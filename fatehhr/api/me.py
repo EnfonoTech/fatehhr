@@ -1,5 +1,7 @@
 import frappe
 
+from fatehhr.api import approvals
+
 
 @frappe.whitelist()
 def profile() -> dict:
@@ -32,6 +34,8 @@ def profile() -> dict:
 		"bank_name": getattr(emp, "bank_name", None),
 		"bank_ac_no": getattr(emp, "bank_ac_no", None),
 		"iban": getattr(emp, "iban", None),
+		# Cooperheat approvals: False on tenants without the cooperheat app.
+		"is_approver": approvals.summary().get("is_approver", False),
 	}
 
 

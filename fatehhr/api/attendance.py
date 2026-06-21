@@ -5,6 +5,7 @@ import frappe
 from frappe.utils import get_datetime
 
 from fatehhr.api.checkin import _naive_site_to_utc_iso
+from fatehhr.api.approvals import PENDING_STATES
 
 
 @frappe.whitelist()
@@ -41,13 +42,20 @@ def month(year: int, month: int) -> dict:
 		d = get_datetime(r["time"]).date().isoformat()
 		by_day.setdefault(d, []).append(r)
 
+	# Cooperheat approval fields exist only where the cooperheat app is
+	# installed; pull them when present so the calendar can show the pending
+	# state + approver, and stay identical on the demo tenant when absent.
+	approvals_on = frappe.get_meta("Attendance").has_field("workflow_state")
+	att_fields = ["name", "attendance_date", "status", "working_hours"]
+	if approvals_on:
+		att_fields += ["workflow_state", "current_approver_name"]
 	attendance_rows = frappe.get_all(
 		"Attendance",
 		filters={
 			"employee": employee,
 			"attendance_date": ["between", [start.isoformat(), end.isoformat()]],
 		},
-		fields=["name", "attendance_date", "status", "working_hours"],
+		fields=att_fields,
 	)
 	att_by_day = {a.attendance_date.isoformat(): a for a in attendance_rows}
 
@@ -71,12 +79,15 @@ def month(year: int, month: int) -> dict:
 		day_rows = by_day.get(key, [])
 		pairs = _build_pairs(day_rows, d)
 		hours = round(sum((p["hours"] for p in pairs)), 2)
-		status = _derive_status(d, att_by_day.get(key), pairs, leave_rows, holidays)
+		arow = att_by_day.get(key)
+		status = _derive_status(d, arow, pairs, leave_rows, holidays)
 		days.append({
 			"date": key,
 			"status": status,
 			"hours_worked": hours,
 			"pairs": pairs,
+			"workflow_state": (arow.get("workflow_state") if arow else None) if approvals_on else None,
+			"current_approver_name": (arow.get("current_approver_name") if arow else None) if approvals_on else None,
 		})
 		d += dt.timedelta(days=1)
 
@@ -84,7 +95,7 @@ def month(year: int, month: int) -> dict:
 
 
 def _empty_summary():
-	return {"present": 0, "absent": 0, "on_leave": 0, "total_hours": 0.0}
+	return {"present": 0, "absent": 0, "on_leave": 0, "pending_approval": 0, "total_hours": 0.0}
 
 
 def _build_pairs(rows, for_date):
@@ -147,6 +158,14 @@ def _iso(t):
 
 def _derive_status(d, attendance_row, pairs, leave_rows, holidays):
 	if attendance_row and attendance_row.status:
+		# A submitted-but-unapproved day shows as "Pending Approval" (orange,
+		# overrides Present/Half Day green) until the workflow reaches a terminal
+		# state. `.get` is safe when the cooperheat fields weren't selected.
+		if (
+			attendance_row.get("workflow_state") in PENDING_STATES
+			and attendance_row.status in ("Present", "Half Day")
+		):
+			return "Pending Approval"
 		return attendance_row.status
 	if d.isoformat() in holidays:
 		return "Holiday"
@@ -183,7 +202,7 @@ def _holidays_for_employee(employee, start, end):
 
 
 def _summarize(days):
-	present = absent = on_leave = 0
+	present = absent = on_leave = pending_approval = 0
 	hours = 0.0
 	for d in days:
 		if d["status"] == "Present":
@@ -192,10 +211,13 @@ def _summarize(days):
 			absent += 1
 		elif d["status"] == "On Leave":
 			on_leave += 1
+		elif d["status"] == "Pending Approval":
+			pending_approval += 1
 		hours += d["hours_worked"]
 	return {
 		"present": present,
 		"absent": absent,
 		"on_leave": on_leave,
+		"pending_approval": pending_approval,
 		"total_hours": round(hours, 2),
 	}
