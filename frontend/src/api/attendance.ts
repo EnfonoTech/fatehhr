@@ -4,6 +4,9 @@ export interface DayRec {
   date: string;
   status: string;
   hours_worked: number;
+  /** Cooperheat: present only on tenants with the approval workflow. */
+  workflow_state?: string | null;
+  current_approver_name?: string | null;
   pairs: {
     in: string;
     out: string;
@@ -18,7 +21,13 @@ export interface MonthResp {
   year: number;
   month: number;
   days: DayRec[];
-  summary: { present: number; absent: number; on_leave: number; total_hours: number };
+  summary: {
+    present: number;
+    absent: number;
+    on_leave: number;
+    pending_approval?: number;
+    total_hours: number;
+  };
 }
 
 export const attendanceApi = {

@@ -7,6 +7,7 @@ import SyncBar from "@/components/SyncBar.vue";
 import BottomNav from "@/components/BottomNav.vue";
 import BottomSheet from "@/components/BottomSheet.vue";
 import Card from "@/components/Card.vue";
+import Chip from "@/components/Chip.vue";
 import { useAttendanceStore } from "@/stores/attendance";
 
 const { t } = useI18n();
@@ -48,6 +49,7 @@ function next() {
 function statusClass(s: string): string {
   const map: Record<string, string> = {
     Present: "is-present",
+    "Pending Approval": "is-pending",
     Absent: "is-absent",
     "Half Day": "is-half",
     "On Leave": "is-leave",
@@ -55,6 +57,14 @@ function statusClass(s: string): string {
     Weekend: "is-weekend",
   };
   return map[s] ?? "";
+}
+
+function approvalVariant(state: string | null | undefined): "pending" | "approved" | "rejected" | "neutral" {
+  if (!state) return "neutral";
+  if (state.includes("Pending")) return "pending";
+  if (state === "Approved") return "approved";
+  if (state === "Rejected") return "rejected";
+  return "neutral";
 }
 
 function tap(d: string) {
@@ -105,12 +115,22 @@ const selected = computed(() =>
       <div><strong>{{ summary.present }}</strong> {{ t("attendance.present") }}</div>
       <div><strong>{{ summary.absent }}</strong> {{ t("attendance.absent") }}</div>
       <div><strong>{{ summary.on_leave }}</strong> {{ t("attendance.on_leave") }}</div>
+      <div v-if="summary.pending_approval">
+        <strong>{{ summary.pending_approval }}</strong> {{ t("attendance.pending_approval") }}
+      </div>
       <div><strong>{{ summary.total_hours.toFixed(1) }}</strong> {{ t("attendance.hours") }}</div>
     </Card>
 
     <BottomSheet :open="!!selected" :title="selected?.date" @close="selectedDate = null">
       <template v-if="selected">
         <p>{{ t("attendance.status") }}: <strong>{{ selected.status || "—" }}</strong></p>
+        <p v-if="selected.workflow_state" class="cal__approval">
+          {{ t("attendance.approval_status") }}:
+          <Chip :variant="approvalVariant(selected.workflow_state)">{{ selected.workflow_state }}</Chip>
+        </p>
+        <p v-if="selected.current_approver_name">
+          {{ t("attendance.current_approver") }}: <strong>{{ selected.current_approver_name }}</strong>
+        </p>
         <p>{{ t("attendance.hours") }}: <strong>{{ selected.hours_worked.toFixed(2) }}</strong></p>
         <ul class="cal__pairs" v-if="selected.pairs.length">
           <li v-for="(p, i) in selected.pairs" :key="i">
@@ -149,6 +169,7 @@ const selected = computed(() =>
   cursor: pointer;
 }
 .cal__cell.is-present { background: #D8E8DE; color: var(--success); }
+.cal__cell.is-pending { background: var(--warning-soft); color: var(--warning); }
 .cal__cell.is-absent { background: #F2DBD6; color: var(--danger); }
 .cal__cell.is-half { background: #F2E4C7; color: var(--warning); }
 .cal__cell.is-leave { background: #D8E0EA; color: var(--info); }
@@ -170,4 +191,5 @@ const selected = computed(() =>
 .cal__summary > div { font-size: 11px; color: var(--ink-secondary); text-transform: uppercase; letter-spacing: .04em; }
 .cal__pairs { padding-left: 16px; }
 .cal__empty { color: var(--ink-secondary); font-size: 13px; }
+.cal__approval { display: flex; align-items: center; gap: 8px; }
 </style>
