@@ -8,6 +8,7 @@ interface CustomerEnv {
   CUSTOMER_LOCALE?: string;
   CUSTOMER_SELFIE_MODE?: string;
   CUSTOMER_BUILD_TARGET?: string;
+  CUSTOMER_APPROVALS_ENABLED?: string;
 }
 
 export function fatehhrThemePlugin(env: CustomerEnv): Plugin {
@@ -35,6 +36,7 @@ export function fatehhrThemePlugin(env: CustomerEnv): Plugin {
         export const CUSTOMER_LOCALE = ${JSON.stringify(env.CUSTOMER_LOCALE ?? "en")};
         export const CUSTOMER_SELFIE_MODE = ${JSON.stringify(env.CUSTOMER_SELFIE_MODE ?? "off")};
         export const CUSTOMER_BUILD_TARGET = ${JSON.stringify(env.CUSTOMER_BUILD_TARGET ?? "web")};
+        export const CUSTOMER_APPROVALS_ENABLED = ${JSON.stringify(env.CUSTOMER_APPROVALS_ENABLED === "true")};
         export const ACCENT_TOKENS = ${JSON.stringify(tokens)};
       `;
     },

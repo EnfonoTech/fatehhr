@@ -9,6 +9,7 @@ declare module "virtual:fatehhr-theme" {
   export const CUSTOMER_LOCALE: "en" | "ar";
   export const CUSTOMER_SELFIE_MODE: "off" | "first" | "every";
   export const CUSTOMER_BUILD_TARGET: "web" | "native";
+  export const CUSTOMER_APPROVALS_ENABLED: boolean;
   export const ACCENT_TOKENS: {
     accent: string;
     accentStrong: string;
