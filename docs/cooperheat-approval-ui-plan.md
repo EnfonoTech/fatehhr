@@ -2,9 +2,11 @@
 
 **Project:** Fateh HR PWA (`/Users/sayanthns/Documents/fatehhr`)
 **Branch:** `develop` (single trunk — NO separate branch; feature ships dark behind a flag)
-**Backend it consumes:** `cooperheat` custom Frappe app (already built — two-level Attendance approval)
+**Backend it consumes:** `cooperheat` custom Frappe app (already built — multi-level, up to **3**, Attendance approval)
 **Source specs:** `Downloads/fatehhr_ui_changes.pdf` (mobile UI) + `Downloads/coopeheatss documentation.pdf` (backend contract)
 **Plan authored:** 2026-06-15
+
+> **VERIFIED against source 2026-06-21** — read the actual `EnfonoTech/cooperheat` repo (not just the PDFs). Corrections applied: (1) it is a **3-level** chain (`Pending Level 1 → 2 → 3 → Approved`), not 2 — fixed `PENDING_STATES`; (2) the active Frappe Workflow is **"Attendance Approval"** on Attendance (the "Shift Assignment Approval" workflow is a stale/unused fixture); (3) time corrections must save **separately before** the workflow transition (cooperheat `validate` checks the edit against the post-transition level). Fieldnames, Department Approval Matrix, per-Project window hours, and the `apply_workflow` approach all matched the source.
 
 ---
 
@@ -37,7 +39,7 @@
 **Attendance** (cooperheat app, DocType is submittable, all states `docstatus=1`):
 - `workflow_state` · `current_approval_level` (Int) · `current_approver` (Link→Employee) · `current_approver_name` (Data) · `approval_window_hours` (Float) · `level_assigned_at` (Datetime) · `window_expires_at` (Datetime) · `window_reminder_sent` (Check)
 - `in_time` / `out_time` / `working_hours` — have Property Setters `allow_on_submit=1`, `read_only=0`.
-- Workflow name **"Shift Assignment Approval"**. States: `Draft`, `Pending Level 1 Approval`, `Pending Level 2 Approval`, `Approved`, `Rejected`.
+- Workflow name **"Attendance Approval"** (active, on Attendance). States: `Pending Level 1 Approval`, `Pending Level 2 Approval`, `Pending Level 3 Approval`, `Approved`, `Rejected` — all `doc_status=1`. Transition actions: `Level 1 Approve` (→L2), `Level 2 Approve` (→L3), `Level 3 Approve` (→Approved), `Reject` (→Rejected from any level), all `allowed=All` + `allow_self_approval=1` (cooperheat `validate` enforces the real per-level approver). Hourly scheduler auto-approves a record stuck at `Pending Level 3 Approval` once its window lapses.
 - Logic hooks (cooperheat `overrides/attendance.py`): `validate` (blocks wrong-approver / expired-window edits, recalcs `working_hours`), `on_update_after_submit` (advances to L2, emails). HR Manager bypasses.
 
 **Employee Checkin** (cooperheat app): field **`activity_log`** (Long Text) — name has **NO `custom_` prefix** (⚠ discovery agents wrongly assumed `custom_activity_log`). Section visible only when `log_type = OUT`.

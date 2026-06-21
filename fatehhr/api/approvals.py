@@ -1,4 +1,11 @@
-"""Attendance approval endpoints for the Cooperheat two-level workflow.
+"""Attendance approval endpoints for the Cooperheat multi-level (up to 3) workflow.
+
+The active backend Workflow is "Attendance Approval" on Attendance, with states
+Pending Level 1/2/3 Approval -> Approved (+ Rejected), transition actions
+"Level N Approve" / "Reject". Approvers come from the Department Approval Matrix
+(per level); the per-level window hours are overridden by the linked Project
+(supervisor / level_2 / manager_payroll_final approval window) else the matrix.
+An hourly scheduler auto-approves once the Level 3 window lapses.
 
 This module is a *consumer* of fields + a Workflow that live in the separate
 `cooperheat` custom app (Attendance: workflow_state, current_approval_level,
@@ -29,7 +36,11 @@ from frappe.utils import cint, flt, get_datetime, now_datetime
 # duplicating them (keeps the single source of UTC-ISO handling, gotcha #1/#2).
 from fatehhr.api.checkin import _naive_site_to_utc_iso, _parse_client_ts
 
-PENDING_STATES = ("Pending Level 1 Approval", "Pending Level 2 Approval")
+PENDING_STATES = (
+	"Pending Level 1 Approval",
+	"Pending Level 2 Approval",
+	"Pending Level 3 Approval",
+)
 TERMINAL_STATES = ("Approved", "Rejected")
 
 # Child DocType holding the per-department approver matrix (cooperheat). Used
@@ -198,13 +209,24 @@ def _action(name, kind, in_time=None, out_time=None, reason=None) -> dict:
 	if wx and get_datetime(wx) < now_datetime() and not _is_hr_manager():
 		frappe.throw(_("The approval window has expired — this record was auto-handled."))
 
-	# Edited times: set on the in-memory doc so the single workflow save()
-	# persists them together (never db_set + save — TimestampMismatch). The
-	# cooperheat `validate` hook recalculates working_hours on save.
+	# Time corrections must be a SEPARATE save BEFORE the workflow transition.
+	# cooperheat's validate authorizes in_time/out_time edits against the level
+	# implied by the CURRENT workflow_state. apply_workflow sets the *next* state
+	# before validate runs, so editing + advancing in one save would re-check the
+	# edit against the next level's approver and wrongly reject it. Edit-then-
+	# transition as two saves mirrors the ERP Desk flow. (Fields carry
+	# allow_on_submit=1, so saving on the submitted doc is permitted.)
+	edits = {}
 	if in_time:
-		doc.in_time = _parse_client_ts(in_time)
+		edits["in_time"] = _parse_client_ts(in_time)
 	if out_time:
-		doc.out_time = _parse_client_ts(out_time)
+		edits["out_time"] = _parse_client_ts(out_time)
+	if edits:
+		for field, value in edits.items():
+			doc.set(field, value)
+		doc.save()  # state unchanged → validate checks the current-level approver (= caller) + recalcs hours
+		frappe.db.commit()
+		doc = frappe.get_doc("Attendance", name)  # reload fresh for the transition
 
 	_apply(doc, kind, reason)
 	frappe.db.commit()
@@ -217,11 +239,12 @@ def _apply(doc, kind: str, reason: str | None) -> None:
 
 	Discovers the transition available to THIS user in the current state
 	(get_transitions respects the Transition's allowed role + state) and picks
-	the one whose action name matches approve/reject. This adapts to whatever
-	the cooperheat workflow actually labels its actions ("Approve",
-	"Approve L1", etc.) and never hardcodes L1 -> L2 -> Approved. apply_workflow
+	the one whose action name matches approve/reject. The active "Attendance
+	Approval" workflow labels its forward actions "Level 1/2/3 Approve" and its
+	reverse "Reject" — matching on the substring keeps this level-agnostic and
+	avoids hardcoding the L1 -> L2 -> L3 -> Approved sequence. apply_workflow
 	performs the save, which fires cooperheat's validate / on_update_after_submit
-	hooks (working-hours recalc, next-level email).
+	hooks (working-hours recalc, next-level stamp + email).
 	"""
 	from frappe.model.workflow import apply_workflow, get_transitions
 
@@ -235,11 +258,11 @@ def _apply(doc, kind: str, reason: str | None) -> None:
 
 	if not chosen:
 		# Defensive: don't guess a next-state and corrupt the workflow. Surface
-		# a precise message so the bench config can be fixed (plan Phase 0).
+		# a precise message so the bench config can be fixed.
 		frappe.throw(
 			_("No '{0}' transition is available for this record. Verify the "
-			  "'Shift Assignment Approval' workflow defines Approve/Reject "
-			  "transitions for your role.").format(wanted)
+			  "'Attendance Approval' workflow defines Approve/Reject transitions "
+			  "for your role.").format(wanted)
 		)
 
 	if reason:
