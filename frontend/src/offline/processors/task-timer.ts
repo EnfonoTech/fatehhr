@@ -42,6 +42,7 @@ registerProcessor("task_timer_stop", async (entry: QueueRecord) => {
     longitude: number | null;
     address: string | null;
     timestamp: string;
+    activity_log?: string | null;
   };
   // Prefer the serverSessionId the client had at stop-time (online start,
   // offline stop). Fall back to the idb mapping (offline start → offline
@@ -57,5 +58,6 @@ registerProcessor("task_timer_stop", async (entry: QueueRecord) => {
     address: p.address,
     timestamp: p.timestamp,
     client_id: p.clientId,
+    activity_log: p.activity_log ?? null,
   });
 });

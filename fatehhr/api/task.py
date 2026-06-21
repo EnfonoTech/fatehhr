@@ -147,6 +147,7 @@ def stop_timer(
 	address: str | None = None,
 	timestamp: str | None = None,
 	client_id: str | None = None,
+	activity_log: str | None = None,
 ) -> dict:
 	employee = _my_employee()
 	ts_name, row_idx_str = session_id.rsplit(":", 1)
@@ -179,6 +180,10 @@ def stop_timer(
 			"custom_geofence_status": "disabled",
 			"custom_client_id": client_id or None,
 		})
+		# Cooperheat daily activity log on the OUT checkin (Timer-Based mode).
+		# Guarded — no-op on tenants without the cooperheat field.
+		if activity_log and frappe.get_meta("Employee Checkin").has_field("activity_log"):
+			checkin_out.activity_log = activity_log
 		checkin_out.flags.ignore_permissions = True
 		try:
 			checkin_out.insert()

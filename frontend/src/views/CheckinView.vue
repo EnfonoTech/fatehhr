@@ -173,11 +173,12 @@ async function submitTimerMode() {
     if (nextLogType.value === "IN") {
       await tasks.start(task.value as string);
     } else {
-      await tasks.stop();
+      await tasks.stop(activityLog.value);
     }
     await hapticMedium();
     message.value = t("checkin.done");
     selfiePhotoId.value = null;
+    activityLog.value = null;
     window.setTimeout(() => {
       if (router.currentRoute.value.name === "checkin") {
         router.replace("/");
@@ -200,7 +201,7 @@ async function submitTimerMode() {
       {{ t(`checkin.geofence.${geofence}`) }}
     </p>
 
-    <section v-if="!timerMode && nextLogType === 'OUT'" class="checkin__activity">
+    <section v-if="nextLogType === 'OUT'" class="checkin__activity">
       <h3>{{ t('checkin.activity_log') }}</h3>
       <p class="checkin__activity-hint">{{ t('checkin.activity_hint') }}</p>
       <textarea

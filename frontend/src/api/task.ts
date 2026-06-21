@@ -35,6 +35,7 @@ export const taskApi = {
     address: string | null;
     timestamp: string;
     client_id?: string;
+    activity_log?: string | null;
   }) =>
     apiCall<{
       session_id: string;

@@ -113,7 +113,7 @@ export const useTasksStore = defineStore("tasks", {
       return { mode: "queued" as const };
     },
 
-    async stop() {
+    async stop(activityLog: string | null = null) {
       if (!this.running) return;
       const sync = useSyncStore();
       const coords = await getCurrentCoords();
@@ -129,6 +129,7 @@ export const useTasksStore = defineStore("tasks", {
             address: null,
             timestamp,
             client_id: clientId,
+            activity_log: activityLog,
           });
           await this.clearRunning();
           this._syncCheckinStatus("OUT", null);
@@ -155,6 +156,7 @@ export const useTasksStore = defineStore("tasks", {
           longitude: coords?.longitude ?? null,
           address: null,
           timestamp,
+          activity_log: activityLog,
         },
         [],
       );
