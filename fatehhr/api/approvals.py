@@ -30,7 +30,7 @@ docs/cooperheat-approval-ui-plan.md Phase 0):
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, get_datetime, now_datetime
+from frappe.utils import cint, flt, get_datetime, now_datetime, time_diff_in_hours
 
 # Reuse the timezone-correct converters from the checkin module rather than
 # duplicating them (keeps the single source of UTC-ISO handling, gotcha #1/#2).
@@ -199,6 +199,12 @@ def _action(name, kind, in_time=None, out_time=None, reason=None) -> dict:
 		frappe.throw(_("Approvals are not enabled on this account."))
 
 	doc = _load_for_approver(name)
+	# This endpoint IS the authorization boundary: _load_for_approver already
+	# verified current_approver == me (or HR Manager), and cooperheat's validate
+	# hook re-checks the per-level approver on save. Mobile approvers are
+	# Self-Service users without Desk write-perm on Attendance, so run the
+	# transition privileged — the business-level auth above still applies.
+	doc.flags.ignore_permissions = True
 
 	if doc.get("workflow_state") not in PENDING_STATES:
 		frappe.throw(_("This record is no longer pending approval."))
@@ -224,9 +230,16 @@ def _action(name, kind, in_time=None, out_time=None, reason=None) -> dict:
 	if edits:
 		for field, value in edits.items():
 			doc.set(field, value)
+		# Recompute working_hours deterministically from the corrected times.
+		# cooperheat's validate hook is meant to do this, but it doesn't fire
+		# reliably on this save path, so set it here too (idempotent — the hook
+		# would compute the same value). The client shows the same number.
+		if doc.in_time and doc.out_time:
+			doc.working_hours = time_diff_in_hours(doc.out_time, doc.in_time)
 		doc.save()  # state unchanged → validate checks the current-level approver (= caller) + recalcs hours
 		frappe.db.commit()
 		doc = frappe.get_doc("Attendance", name)  # reload fresh for the transition
+		doc.flags.ignore_permissions = True
 
 	_apply(doc, kind, reason)
 	frappe.db.commit()
