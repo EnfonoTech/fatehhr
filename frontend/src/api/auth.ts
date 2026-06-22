@@ -16,4 +16,6 @@ export const authApi = {
     apiCall<LoginResp>("POST", "fatehhr.api.auth.verify_pin", { user, pin }),
   changePin: (old_pin: string, new_pin: string) =>
     apiCall<{ ok: true }>("POST", "fatehhr.api.auth.change_pin", { old_pin, new_pin }),
+  forgotPin: (usr: string, pwd: string) =>
+    apiCall<{ ok: true }>("POST", "fatehhr.api.auth.forgot_pin", { usr, pwd }),
 };

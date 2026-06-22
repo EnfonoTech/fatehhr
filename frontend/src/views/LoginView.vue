@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, nextTick, computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 import { authApi } from "@/api/auth";
 import { ApiError } from "@/api/client";
@@ -19,6 +19,9 @@ const error = ref<string | null>(null);
 const busy = ref(false);
 const session = useSessionStore();
 const router = useRouter();
+const route = useRoute();
+// "Forgot PIN" routes here with ?reset_pin=1 — re-auth clears the server PIN.
+const resetPin = computed(() => route.query.reset_pin === "1");
 
 const emailRef = ref<HTMLInputElement | null>(null);
 const passwordRef = ref<HTMLInputElement | null>(null);
@@ -42,12 +45,17 @@ async function submit() {
   error.value = null;
   try {
     const trimmed = email.value.trim();
+    // PIN recovery: clear the server-side PIN first (password-gated), so the
+    // login below comes back with require_pin_setup → "Set a PIN".
+    if (resetPin.value) {
+      await authApi.forgotPin(trimmed, password.value);
+    }
     const resp = await authApi.login(trimmed, password.value);
     await session.applyLogin(resp);
     // Remember the email so next time we can skip straight to password focus.
     const { secureSet } = await import("@/app/frappe");
     await secureSet("fatehhr.last_login_email", trimmed);
-    router.replace({ name: resp.require_pin_setup ? "pin" : "pin" });
+    router.replace({ name: "pin" });
   } catch (e) {
     error.value =
       e instanceof ApiError && e.status === 401
@@ -62,6 +70,7 @@ async function submit() {
 <template>
   <main class="login">
     <TopAppBar :title="t('login.title')" />
+    <p v-if="resetPin" class="login__reset-hint">{{ t('login.reset_pin_hint') }}</p>
     <form class="login__form" @submit.prevent="submit">
       <label>
         <span>{{ t("login.email") }}</span>
@@ -138,5 +147,10 @@ async function submit() {
 .login__password-toggle:active { background: var(--bg-surface); }
 [dir="rtl"] .login__password-toggle { left: 8px; right: auto; }
 .login__error { color: var(--danger); margin: -4px 0 0; font-size: 13px; }
+.login__reset-hint {
+  margin: 12px var(--page-gutter) -4px; padding: 10px 14px;
+  background: var(--accent-soft, #e2efec); color: var(--accent, #2E5D5A);
+  border-radius: var(--r-md); font-size: 13px; line-height: 1.4;
+}
 .login__lang { margin-top: 8px; color: var(--ink-secondary); font-size: 13px; }
 </style>

@@ -8,7 +8,8 @@
     "forgot": "Forgot password?",
     "wrong": "That email or password didn't match.",
     "show_password": "Show password",
-    "hide_password": "Hide password"
+    "hide_password": "Hide password",
+    "reset_pin_hint": "Re-enter your password to reset your PIN. You'll set a new one next."
   },
   "pin": {
     "title": "Enter PIN",

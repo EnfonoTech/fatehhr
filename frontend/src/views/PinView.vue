@@ -135,7 +135,10 @@ async function submit() {
   }
 }
 function forgot() {
-  session.clear().then(() => router.replace({ name: "login" }));
+  // Recovery: log out and return to login in "reset PIN" mode. Re-authenticating
+  // with the password there clears the server-side PIN (forgot_pin), so the user
+  // is routed into "Set a PIN" instead of being asked for the PIN they forgot.
+  session.clear().then(() => router.replace({ name: "login", query: { reset_pin: "1" } }));
 }
 const title = computed(() => t(mode.value === "setup" ? "pin.setup_title" : "pin.title"));
 </script>

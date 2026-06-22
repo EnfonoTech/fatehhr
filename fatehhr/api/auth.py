@@ -2,7 +2,7 @@ import hashlib
 
 import frappe
 from frappe.auth import LoginManager
-from frappe.utils.password import get_decrypted_password
+from frappe.utils.password import check_password, get_decrypted_password
 
 from fatehhr.utils.secrets import get_or_create_api_secret
 
@@ -80,6 +80,35 @@ def change_pin(old_pin: str, new_pin: str) -> dict:
 	employee.flags.ignore_permissions = True
 	employee.save()
 	frappe.db.commit()
+	return {"ok": True}
+
+
+@frappe.whitelist(allow_guest=True)
+def forgot_pin(usr: str, pwd: str) -> dict:
+	"""Password-gated PIN recovery.
+
+	Verifies the account password (same credential strength as login), then clears
+	the stored PIN so the user is routed back through PIN setup. This is the
+	recovery path for a forgotten PIN, or a fresh device where a server-side PIN
+	already exists but is unknown — re-login alone can't recover it because the PIN
+	persists server-side and just re-prompts the same unknown value.
+	"""
+	# check_password verifies the User's account password and raises
+	# frappe.AuthenticationError on mismatch. Unlike LoginManager it needs no HTTP
+	# request context, so this guest endpoint is robust + unit-testable.
+	check_password(usr, pwd)
+	employee_name = frappe.db.get_value("Employee", {"user_id": usr}, "name")
+	if employee_name:
+		# custom_pin_hash is a Password field (stored in `__Auth`). Removing the row
+		# makes _require_pin_setup() true → the app shows "Set a PIN" next login.
+		# Raw SQL: the `__Auth` table isn't a DocType, so frappe.qb / db.delete
+		# (which target `tab<DocType>`) can't address it. Parameterised — no injection.
+		frappe.db.sql(
+			"DELETE FROM `__Auth` WHERE doctype=%s AND name=%s AND fieldname=%s",
+			("Employee", employee_name, "custom_pin_hash"),
+		)
+		_reset_failed_attempts(employee_name)
+		frappe.db.commit()
 	return {"ok": True}
 
 
