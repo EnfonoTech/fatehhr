@@ -103,48 +103,71 @@ function serverMessage(e: ApiError): string | null {
   return null;
 }
 
-async function runAction(fn: () => Promise<unknown>, okKey: "approved_done" | "rejected_done") {
-  busy.value = true;
-  message.value = null;
-  try {
-    await fn();
-    message.value = t(`approvals.${okKey}`);
-    window.setTimeout(() => router.replace("/approvals"), 800);
-  } catch (e) {
-    armedApprove.value = false;
-    armedReject.value = false;
-    if (e instanceof ApiError) {
-      message.value = serverMessage(e) || t("approvals.action_failed");
-    } else {
-      // fetch rejected → no connection. Approvals never queue.
-      message.value = t("approvals.online_only");
-    }
-  } finally {
-    busy.value = false;
+function handleErr(e: unknown) {
+  armedApprove.value = false;
+  armedReject.value = false;
+  if (e instanceof ApiError) {
+    message.value = serverMessage(e) || t("approvals.action_failed");
+  } else {
+    // fetch rejected → no connection. Approvals never queue.
+    message.value = t("approvals.online_only");
   }
 }
 
-function onApprove() {
+async function onApprove() {
   if (!d.value) return;
+  // First tap arms the confirm; second tap commits.
   if (!armedApprove.value) {
     armedApprove.value = true;
     armedReject.value = false;
     return;
   }
-  runAction(
-    () => store.approve(d.value!.name, changed(editedIn.value, d.value!.in_time), changed(editedOut.value, d.value!.out_time)),
-    "approved_done",
-  );
+  busy.value = true;
+  message.value = null;
+  try {
+    const res = await store.approve(
+      d.value.name,
+      changed(editedIn.value, d.value.in_time),
+      changed(editedOut.value, d.value.out_time),
+    );
+    armedApprove.value = false;
+    if (res.workflow_state === "Approved") {
+      message.value = t("approvals.fully_approved");
+      window.setTimeout(() => router.replace("/approvals"), 1000);
+    } else {
+      // Advanced one level — refresh in place so the user sees the new level
+      // and can continue the chain (it is NOT "stuck"; it needs the next approval).
+      await store.loadDetail(name);
+      editedIn.value = toLocalInput(store.detail?.in_time ?? null);
+      editedOut.value = toLocalInput(store.detail?.out_time ?? null);
+      message.value = t("approvals.advanced");
+    }
+  } catch (e) {
+    handleErr(e);
+  } finally {
+    busy.value = false;
+  }
 }
 
-function onReject() {
+async function onReject() {
   if (!d.value) return;
   if (!armedReject.value) {
     armedReject.value = true;
     armedApprove.value = false;
     return;
   }
-  runAction(() => store.reject(d.value!.name, reason.value || null), "rejected_done");
+  busy.value = true;
+  message.value = null;
+  try {
+    await store.reject(d.value.name, reason.value || null);
+    armedReject.value = false;
+    message.value = t("approvals.rejected_done");
+    window.setTimeout(() => router.replace("/approvals"), 1000);
+  } catch (e) {
+    handleErr(e);
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
@@ -157,7 +180,7 @@ function onReject() {
         <p class="ad__date">{{ d.attendance_date || '—' }}</p>
         <div class="ad__chips">
           <Chip :variant="approvalVariant(d.workflow_state)">{{ d.workflow_state }}</Chip>
-          <Chip variant="neutral">{{ t('approvals.level', { n: d.current_approval_level || 1 }) }}</Chip>
+          <Chip v-if="isPending" variant="neutral">{{ t('approvals.level_of', { n: d.current_approval_level || 1 }) }}</Chip>
         </div>
         <p v-if="d.current_approver_name" class="ad__approver">
           {{ t('attendance.current_approver') }}: <strong>{{ d.current_approver_name }}</strong>
@@ -195,6 +218,7 @@ function onReject() {
             {{ armedReject ? t('approvals.confirm_reject') : t('approvals.reject') }}
           </AppButton>
         </div>
+        <p v-if="armedApprove || armedReject" class="ad__confirm-hint">{{ t('approvals.confirm_hint') }}</p>
       </template>
 
       <p v-if="message" class="ad__msg">{{ message }}</p>
@@ -231,5 +255,6 @@ function onReject() {
 }
 .ad__reason { display: flex; flex-direction: column; gap: 6px; }
 .ad__actions { display: flex; flex-direction: column; gap: 10px; }
-.ad__msg { text-align: center; color: var(--ink-secondary); font-size: 13px; margin: 4px 0 0; }
+.ad__confirm-hint { text-align: center; color: var(--warning); font-size: 12.5px; margin: 8px 0 0; }
+.ad__msg { text-align: center; color: var(--ink-secondary); font-size: 13px; margin: 8px 0 0; padding: 10px 12px; background: var(--bg-sunk); border-radius: var(--r-md); }
 </style>

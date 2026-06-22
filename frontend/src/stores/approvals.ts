@@ -47,19 +47,18 @@ export const useApprovalsStore = defineStore("approvals", {
       this.detail = await approvalsApi.detail(name);
     },
 
-    /** Online-only. Re-throws on failure (no queue). */
+    /** Online-only. Re-throws on failure (no queue). Returns the new state so the
+     *  caller can tell "advanced a level" from "fully approved". */
     async approve(name: string, inTime?: string | null, outTime?: string | null) {
       const res = await approvalsApi.approve(name, inTime, outTime);
-      this.pending = this.pending.filter((r) => r.name !== name);
-      await this.loadSummary();
+      await Promise.all([this.loadPending(), this.loadDone(), this.loadSummary()]);
       return res;
     },
 
     /** Online-only. Re-throws on failure (no queue). */
     async reject(name: string, reason?: string | null) {
       const res = await approvalsApi.reject(name, reason);
-      this.pending = this.pending.filter((r) => r.name !== name);
-      await this.loadSummary();
+      await Promise.all([this.loadPending(), this.loadDone(), this.loadSummary()]);
       return res;
     },
   },

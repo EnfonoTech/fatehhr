@@ -5,8 +5,8 @@ import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
 import SyncBar from "@/components/SyncBar.vue";
 import BottomNav from "@/components/BottomNav.vue";
-import ListRow from "@/components/ListRow.vue";
 import Chip from "@/components/Chip.vue";
+import Icon from "@/components/Icon.vue";
 import { useApprovalsStore } from "@/stores/approvals";
 import type { ApprovalRow } from "@/api/approvals";
 
@@ -15,8 +15,6 @@ const router = useRouter();
 const store = useApprovalsStore();
 
 const tab = ref<"pending" | "done">("pending");
-// Ticks once a minute so the "time left" chips stay roughly current without a
-// per-second timer. Captured reactively; cleaned up on unmount.
 const now = ref(Date.now());
 let tick: number | null = null;
 
@@ -31,6 +29,12 @@ onUnmounted(() => {
 
 function open(row: ApprovalRow) {
   router.push(`/approvals/${encodeURIComponent(row.name)}`);
+}
+
+function initials(name: string | null, fallback: string): string {
+  const src = (name || fallback || "?").trim();
+  const parts = src.split(/\s+/).filter(Boolean).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
 function fmtHM(iso: string | null): string {
@@ -48,7 +52,6 @@ function approvalVariant(state: string | null): "pending" | "approved" | "reject
   return "neutral";
 }
 
-/** Human "time left" until the approval window expires. */
 function windowLeft(iso: string | null): { text: string; expired: boolean } | null {
   if (!iso) return null;
   const exp = new Date(iso).getTime();
@@ -58,8 +61,7 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
   const mins = Math.floor(ms / 60_000);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  const span = h > 0 ? `${h}h ${m}m` : `${m}m`;
-  return { text: t("approvals.window_left", { time: span }), expired: false };
+  return { text: t("approvals.window_left", { time: h > 0 ? `${h}h ${m}m` : `${m}m` }), expired: false };
 }
 </script>
 
@@ -68,50 +70,75 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
     <TopAppBar :title="t('approvals.title')" back @back="router.back()" />
     <SyncBar />
 
-    <div class="appr__tabs">
-      <button class="tab" :class="{ 'is-active': tab === 'pending' }" @click="tab = 'pending'">
+    <!-- Segmented control -->
+    <div class="seg" role="tablist">
+      <button
+        class="seg__opt"
+        :class="{ 'is-active': tab === 'pending' }"
+        role="tab"
+        @click="tab = 'pending'"
+      >
         {{ t('approvals.pending') }}
-        <span v-if="store.summary.pending_count" class="tab__count">{{ store.summary.pending_count }}</span>
+        <span v-if="store.summary.pending_count" class="seg__badge">{{ store.summary.pending_count }}</span>
       </button>
-      <button class="tab" :class="{ 'is-active': tab === 'done' }" @click="tab = 'done'">
+      <button
+        class="seg__opt"
+        :class="{ 'is-active': tab === 'done' }"
+        role="tab"
+        @click="tab = 'done'"
+      >
         {{ t('approvals.done') }}
       </button>
     </div>
 
+    <!-- PENDING -->
     <template v-if="tab === 'pending'">
-      <div v-for="r in store.pending" :key="r.name" class="appr__row" @click="open(r)">
-        <ListRow
-          :title="r.employee_name || r.employee"
-          :subtitle="`${r.attendance_date || '—'} · ${fmtHM(r.in_time)} → ${fmtHM(r.out_time)}`"
-        />
-        <div class="appr__meta">
-          <Chip :variant="approvalVariant(r.workflow_state)">
-            {{ t('approvals.level', { n: r.current_approval_level || 1 }) }}
-          </Chip>
-          <Chip
-            v-if="windowLeft(r.window_expires_at)"
-            :variant="windowLeft(r.window_expires_at)!.expired ? 'rejected' : 'neutral'"
-          >
-            {{ windowLeft(r.window_expires_at)!.text }}
-          </Chip>
-        </div>
+      <button v-for="r in store.pending" :key="r.name" class="ac" @click="open(r)">
+        <span class="ac__avatar">{{ initials(r.employee_name, r.employee) }}</span>
+        <span class="ac__body">
+          <span class="ac__top">
+            <span class="ac__name">{{ r.employee_name || r.employee }}</span>
+            <Chip
+              v-if="windowLeft(r.window_expires_at)"
+              :variant="windowLeft(r.window_expires_at)!.expired ? 'rejected' : 'neutral'"
+            >{{ windowLeft(r.window_expires_at)!.text }}</Chip>
+          </span>
+          <span class="ac__sub">
+            {{ r.attendance_date || '—' }} · {{ fmtHM(r.in_time) }} → {{ fmtHM(r.out_time) }}
+            <template v-if="r.working_hours"> · {{ t('approvals.hours_short', { n: r.working_hours.toFixed(1) }) }}</template>
+          </span>
+          <span class="ac__chips">
+            <Chip variant="pending">{{ t('approvals.level_of', { n: r.current_approval_level || 1 }) }}</Chip>
+          </span>
+        </span>
+        <Icon name="chevron-right" :size="18" class="ac__chev" />
+      </button>
+      <div v-if="!store.loading && !store.pending.length" class="appr__empty">
+        <Icon name="approvals" :size="40" />
+        <p>{{ t('approvals.empty_pending') }}</p>
       </div>
-      <p v-if="!store.loading && !store.pending.length" class="appr__empty">
-        {{ t('approvals.empty_pending') }}
-      </p>
     </template>
 
+    <!-- DONE -->
     <template v-else>
-      <div v-for="r in store.done" :key="r.name" class="appr__row" @click="open(r)">
-        <ListRow
-          :title="r.employee_name || r.employee"
-          :subtitle="`${r.attendance_date || '—'} · ${fmtHM(r.in_time)} → ${fmtHM(r.out_time)}`"
-        />
-        <div class="appr__meta">
-          <Chip :variant="approvalVariant(r.workflow_state)">{{ r.workflow_state }}</Chip>
-        </div>
+      <button v-for="r in store.done" :key="r.name" class="ac" @click="open(r)">
+        <span class="ac__avatar">{{ initials(r.employee_name, r.employee) }}</span>
+        <span class="ac__body">
+          <span class="ac__top">
+            <span class="ac__name">{{ r.employee_name || r.employee }}</span>
+            <Chip :variant="approvalVariant(r.workflow_state)">{{ r.workflow_state }}</Chip>
+          </span>
+          <span class="ac__sub">
+            {{ r.attendance_date || '—' }} · {{ fmtHM(r.in_time) }} → {{ fmtHM(r.out_time) }}
+            <template v-if="r.working_hours"> · {{ t('approvals.hours_short', { n: r.working_hours.toFixed(1) }) }}</template>
+          </span>
+        </span>
+        <Icon name="chevron-right" :size="18" class="ac__chev" />
+      </button>
+      <div v-if="!store.done.length" class="appr__empty">
+        <Icon name="approvals" :size="40" />
+        <p>{{ t('approvals.empty_done') }}</p>
       </div>
-      <p v-if="!store.done.length" class="appr__empty">{{ t('approvals.empty_done') }}</p>
     </template>
 
     <BottomNav />
@@ -120,21 +147,58 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
 
 <style scoped>
 .appr { padding: 0 var(--page-gutter) 120px; }
-.appr__tabs { display: flex; gap: 8px; margin: 8px 0 16px; }
-.appr__tabs .tab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; font: inherit; font-size: 13px; border: 0; cursor: pointer;
-  border-radius: var(--r-md); background: var(--bg-sunk); color: var(--ink-secondary);
+
+/* Segmented control */
+.seg {
+  display: flex; gap: 4px; padding: 4px; margin: 10px 0 16px;
+  background: var(--bg-sunk); border-radius: var(--r-full);
 }
-.appr__tabs .tab.is-active {
-  background: var(--bg-surface); box-shadow: var(--e-1); color: var(--ink-primary);
+.seg__opt {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 0; border: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 500;
+  border-radius: var(--r-full); background: transparent; color: var(--ink-secondary);
+  transition: background var(--m-micro), color var(--m-micro);
 }
-.tab__count {
+.seg__opt.is-active { background: var(--bg-surface); color: var(--ink-primary); box-shadow: var(--e-1); }
+.seg__badge {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-full);
   background: var(--accent); color: var(--accent-ink);
-  font-size: 11px; display: grid; place-items: center;
+  font-size: 11px; font-weight: 600; display: grid; place-items: center;
 }
-.appr__row { padding-bottom: 8px; cursor: pointer; }
-.appr__meta { display: flex; align-items: center; gap: 8px; padding: 4px 0 12px; flex-wrap: wrap; }
-.appr__empty { padding: 40px 0; color: var(--ink-secondary); text-align: center; }
+
+/* Approval card */
+.ac {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin-bottom: 10px;
+  background: var(--bg-surface); border: 0; border-radius: var(--r-lg); box-shadow: var(--e-1);
+  text-align: start; cursor: pointer; font: inherit;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.ac:active { transform: scale(0.99); background: var(--bg-sunk); }
+.ac__avatar {
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--r-full);
+  display: grid; place-items: center;
+  background: var(--accent-soft, #e2efec); color: var(--accent, #2E5D5A);
+  font-family: var(--font-display); font-weight: 600; font-size: 15px;
+}
+.ac__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ac__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ac__name {
+  font-size: 15px; font-weight: 600; color: var(--ink-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ac__sub {
+  font-size: 12.5px; color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ac__chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.ac__chev { color: var(--ink-tertiary); flex-shrink: 0; }
+[dir="rtl"] .ac__chev { transform: scaleX(-1); }
+
+.appr__empty {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 56px 24px; color: var(--ink-tertiary); text-align: center;
+}
+.appr__empty p { margin: 0; font-size: 14px; color: var(--ink-secondary); }
 </style>
