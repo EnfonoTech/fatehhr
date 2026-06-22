@@ -377,6 +377,42 @@ non-null, so the card ticks in real time.
 
 ---
 
+### 16. Cooperheat attendance-approval (branch `feature/cooperheat-approvals`)
+
+Mobile UI consuming the separate `cooperheat` app's approval backend. fatehhr adds
+API + screens only; it declares **no DocTypes/custom fields** (cooperheat owns the
+Attendance workflow + fields + `Employee Checkin.activity_log`).
+
+- **3-level, sequential-by-approval.** Active Frappe Workflow "Attendance Approval"
+  on Attendance: `Pending Level 1 → 2 → 3 → Approved` (+ Rejected). Actions
+  "Level N Approve"/"Reject", `allowed=All` — cooperheat's `validate` enforces the
+  real per-level approver (Department Approval Matrix). L2 sees a record only **after
+  L1 approves** (`current_approver` moves on approval). The hourly scheduler
+  auto-approves **only at Level 3** on window lapse; L1/L2 never auto-advance.
+  → `PENDING_STATES` MUST list all three pending states (missing L3 hides records).
+- **Approvers are Self-Service users without Attendance write-perm.** Approve via
+  `apply_workflow(doc, action)` discovered with `get_transitions` (level-agnostic),
+  with `doc.flags.ignore_permissions = True` set AFTER the in-method
+  `current_approver == me` check — the whitelisted endpoint is the authz boundary;
+  cooperheat `validate` still re-checks.
+- **Time corrections = a SEPARATE save BEFORE the transition.** cooperheat `validate`
+  authorises in_time/out_time edits against the *current* workflow_state's level;
+  `apply_workflow` sets the *next* state before validate runs, so edit+advance in one
+  save is rejected. Save edits first → commit → reload → transition (mirrors Desk).
+- **PIN is server-side:** `Employee.custom_pin_hash` (a Password field).
+  `require_pin_setup` = no hash. Forgot-PIN needs a **password-gated server reset**
+  (`auth.forgot_pin` deletes the `__Auth` row) — clearing local state alone loops on
+  re-login. The unlock path verifies server-side (`verify_pin`) when no local hash.
+- **Gating:** build flag `CUSTOMER_APPROVALS_ENABLED` (per-customer env) + runtime
+  `is_approver`. Hidden for normal employees; dark in other customer builds.
+- **Native APK CORS:** the site needs `allow_cors=["capacitor://localhost","https://localhost"]`.
+- **hr_demo gotcha:** installing cooperheat back-fills existing Attendance to
+  "Pending Level 1" (Frappe sets workflow_state when a workflow activates), and
+  `Employee.custom_site_id` (Table → `Employee Site Access`) is broken where that
+  child DocType isn't created → blocks `Employee.save`.
+
+---
+
 ## Standing rules derived from above
 
 1. **Any datetime to the client → UTC-ISO with `Z`.** No naive strings, ever.
@@ -391,3 +427,7 @@ non-null, so the card ticks in real time.
 10. **Never commit `dist/`, `*.apk`, `*.keystore`, or stale `.vue.js` artifacts.**
 11. **`bump-version.mjs` is the only way to bump `NATIVE_VERSION` / `NATIVE_VERSION_CODE`.** They stay in lockstep.
 12. **Maintenance window is 2:00–5:00 AM IST.** For same-day fixes, `supervisorctl signal QUIT` not `restart`.
+13. **Stale compiled `.js` shadow `.ts`.** `build-customer.sh` runs `vue-tsc -b` (emits `.js` beside `.ts`) and Vite resolves `.js` first. If editing a `.ts` shows old behaviour, delete the matching stale `.js`.
+14. **Approve/Reject are online-only — never queue them.** Approval windows expire; a stale offline action could race the auto-approver. (Activity-log on check-out *does* ride the queue.)
+15. **Clearing a Password DocField → delete its `__Auth` row** (or `set_encrypted_password`). Plain `db.set_value(field, None)` does NOT clear it — Password values live in `__Auth`, not the doctype table.
+16. **Long gradle builds survive session churn via `nohup … & disown`** writing a `DONE` marker file; tracked background tasks get killed on session reset.
