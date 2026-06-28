@@ -160,7 +160,105 @@ def detail(name: str) -> dict:
 	doc = _load_for_approver(name)
 	d = _shape(doc.as_dict())
 	d["department"] = doc.get("department")
+	d["site_hours"] = _site_hours(doc)
+	d["checkins"] = _day_checkins(doc)
 	return d
+
+
+def _site_hours(doc) -> list[dict]:
+	"""The derived per-site pairs (cooperheat `custom_site_hours`) for display."""
+	if not frappe.get_meta("Attendance").has_field("custom_site_hours"):
+		return []
+	out = []
+	for r in doc.get("custom_site_hours") or []:
+		out.append({
+			"project": r.get("project"),
+			"project_name": r.get("project_name"),
+			"check_in_time": _naive_site_to_utc_iso(r.get("check_in_time")),
+			"check_out_time": _naive_site_to_utc_iso(r.get("check_out_time")),
+			"hours": flt(r.get("hours")),
+		})
+	return out
+
+
+def _day_checkins(doc) -> list[dict]:
+	"""Raw Employee Checkin logs for the record's employee+date — the editable
+	source of truth behind the pairs. Each row carries its site (custom_project)."""
+	if not doc.get("employee") or not doc.get("attendance_date"):
+		return []
+	has_proj = frappe.get_meta("Employee Checkin").has_field("custom_project")
+	date_str = str(doc.attendance_date)
+	fields = ["name", "log_type", "time"] + (["custom_project"] if has_proj else [])
+	rows = frappe.get_all(
+		"Employee Checkin",
+		filters=[
+			["employee", "=", doc.employee],
+			["time", "between", [date_str + " 00:00:00", date_str + " 23:59:59"]],
+		],
+		fields=fields,
+		order_by="time asc",
+	)
+	out = []
+	for r in rows:
+		proj = r.get("custom_project") if has_proj else None
+		out.append({
+			"name": r.name,
+			"log_type": r.log_type,
+			"time": _naive_site_to_utc_iso(r.time),
+			"project": proj,
+			"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+		})
+	return out
+
+
+@frappe.whitelist()
+def update_checkin_times(name: str, edits) -> dict:
+	"""Approver corrects multiple check-in/out times. Edits the RAW Employee Checkin
+	`time` values (source of truth) — cooperheat's checkin hooks re-validate overlap
+	and re-derive the Attendance site-hours. Auth: current-level approver (or HR
+	Manager) of a pending record, within the approval window.
+
+	`edits` = JSON list of {"checkin": <name>, "time": <UTC-ISO>}.
+	"""
+	import json
+	if not _enabled():
+		frappe.throw(_("Approvals are not enabled on this account."))
+	if isinstance(edits, str):
+		edits = json.loads(edits or "[]")
+
+	doc = _load_for_approver(name)
+	if doc.get("workflow_state") not in PENDING_STATES:
+		frappe.throw(_("This record is no longer pending approval."))
+	wx = doc.get("window_expires_at")
+	if wx and get_datetime(wx) < now_datetime() and not _is_hr_manager():
+		frappe.throw(_("The approval window has expired — times can no longer be edited."))
+
+	changed = 0
+	for e in edits or []:
+		cname, t = e.get("checkin"), e.get("time")
+		if not cname or not t:
+			continue
+		ci = frappe.db.get_value("Employee Checkin", cname, ["employee"], as_dict=True)
+		if not ci or ci.employee != doc.employee:
+			# Never let an approver edit a checkin outside this record's employee.
+			continue
+		cdoc = frappe.get_doc("Employee Checkin", cname)
+		cdoc.time = _parse_client_ts(t)
+		cdoc.flags.ignore_permissions = True
+		cdoc.save()  # fires cooperheat validate (overlap) + sync → re-derive site_hours
+		changed += 1
+
+	if changed:
+		frappe.db.commit()
+		# Belt-and-suspenders: ask cooperheat to recompute the attendance totals.
+		try:
+			from cooperheat.cooperheat.api.api import recalculate_site_hours
+			recalculate_site_hours(name)
+			frappe.db.commit()
+		except Exception:
+			pass
+
+	return detail(name)
 
 
 @frappe.whitelist()

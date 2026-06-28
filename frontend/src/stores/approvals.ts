@@ -47,6 +47,12 @@ export const useApprovalsStore = defineStore("approvals", {
       this.detail = await approvalsApi.detail(name);
     },
 
+    /** Online-only. Edits the raw checkin times; returns the refreshed detail. */
+    async updateCheckins(name: string, edits: { checkin: string; time: string }[]) {
+      this.detail = await approvalsApi.updateCheckinTimes(name, edits);
+      return this.detail;
+    },
+
     /** Online-only. Re-throws on failure (no queue). Returns the new state so the
      *  caller can tell "advanced a level" from "fully approved". */
     async approve(name: string, inTime?: string | null, outTime?: string | null) {

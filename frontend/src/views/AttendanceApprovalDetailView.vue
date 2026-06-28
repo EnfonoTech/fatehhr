@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from "vue";
+import { onMounted, onUnmounted, ref, reactive, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
@@ -16,8 +16,8 @@ const router = useRouter();
 const store = useApprovalsStore();
 
 const name = String(route.params.name);
-const editedIn = ref<string>("");   // datetime-local string
-const editedOut = ref<string>("");
+// checkin.name -> datetime-local string (editable). Multi-site: a day has many.
+const editedTimes = reactive<Record<string, string>>({});
 const reason = ref<string>("");
 const armedApprove = ref(false);
 const armedReject = ref(false);
@@ -26,11 +26,17 @@ const message = ref<string | null>(null);
 const now = ref(Date.now());
 let tick: number | null = null;
 
+function seedEdits() {
+  Object.keys(editedTimes).forEach((k) => delete editedTimes[k]);
+  for (const c of store.detail?.checkins ?? []) {
+    editedTimes[c.name] = toLocalInput(c.time);
+  }
+}
+
 onMounted(async () => {
   try {
     await store.loadDetail(name);
-    editedIn.value = toLocalInput(store.detail?.in_time ?? null);
-    editedOut.value = toLocalInput(store.detail?.out_time ?? null);
+    seedEdits();
   } catch (e) {
     message.value = e instanceof ApiError ? serverMessage(e) || t("approvals.not_yours") : t("approvals.online_only");
   }
@@ -41,24 +47,57 @@ onUnmounted(() => {
 });
 
 const d = computed(() => store.detail);
-
 const isPending = computed(() => (d.value?.workflow_state || "").includes("Pending"));
-
 const expired = computed(() => {
   const iso = d.value?.window_expires_at;
   if (!iso) return false;
   const exp = new Date(iso).getTime();
   return !Number.isNaN(exp) && exp <= now.value;
 });
-
 const canAct = computed(() => isPending.value && !expired.value);
 
-const workedHours = computed(() => {
-  const a = editedIn.value ? new Date(editedIn.value).getTime() : NaN;
-  const b = editedOut.value ? new Date(editedOut.value).getTime() : NaN;
-  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return d.value?.working_hours ?? 0;
-  return Math.round(((b - a) / 3_600_000) * 100) / 100;
+interface Pair { id: string; project: string | null; inName: string | null; outName: string | null; }
+// Pair the raw checkins IN→OUT for display; each row's times stay individually editable.
+const pairs = computed<Pair[]>(() => {
+  const cks = d.value?.checkins ?? [];
+  const out: Pair[] = [];
+  let openIn: typeof cks[number] | null = null;
+  for (const c of cks) {
+    if (c.log_type === "IN") {
+      if (openIn) out.push({ id: openIn.name, project: openIn.project_name, inName: openIn.name, outName: null });
+      openIn = c;
+    } else {
+      out.push({ id: c.name, project: (openIn?.project_name ?? c.project_name), inName: openIn?.name ?? null, outName: c.name });
+      openIn = null;
+    }
+  }
+  if (openIn) out.push({ id: openIn.name, project: openIn.project_name, inName: openIn.name, outName: null });
+  return out;
 });
+const hasCheckins = computed(() => (d.value?.checkins?.length ?? 0) > 0);
+
+function pairHours(p: Pair): number {
+  const a = p.inName && editedTimes[p.inName] ? new Date(editedTimes[p.inName]).getTime() : NaN;
+  const b = p.outName && editedTimes[p.outName] ? new Date(editedTimes[p.outName]).getTime() : NaN;
+  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 0;
+  return Math.round(((b - a) / 3_600_000) * 100) / 100;
+}
+const totalHours = computed(() => pairs.value.reduce((s, p) => s + pairHours(p), 0));
+
+/** Original checkin time (UTC-ISO) for a checkin name, to detect edits. */
+function originalIso(checkinName: string): string | null {
+  return d.value?.checkins?.find((c) => c.name === checkinName)?.time ?? null;
+}
+function dirtyEdits(): { checkin: string; time: string }[] {
+  const out: { checkin: string; time: string }[] = [];
+  for (const [cname, local] of Object.entries(editedTimes)) {
+    if (local && local !== toLocalInput(originalIso(cname))) {
+      const iso = toUtcIso(local);
+      if (iso) out.push({ checkin: cname, time: iso });
+    }
+  }
+  return out;
+}
 
 function approvalVariant(state: string | null | undefined): "pending" | "approved" | "rejected" | "neutral" {
   if (!state) return "neutral";
@@ -67,7 +106,6 @@ function approvalVariant(state: string | null | undefined): "pending" | "approve
   if (state === "Rejected") return "rejected";
   return "neutral";
 }
-
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
   const dt = new Date(iso);
@@ -75,18 +113,11 @@ function toLocalInput(iso: string | null): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}T${p(dt.getHours())}:${p(dt.getMinutes())}`;
 }
-
 function toUtcIso(local: string): string | null {
   if (!local) return null;
-  const dt = new Date(local); // parsed as device-local
+  const dt = new Date(local);
   return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
 }
-
-/** Only send a time if the approver actually changed it (preserves seconds). */
-function changed(localValue: string, originalIso: string | null): string | null {
-  return localValue !== toLocalInput(originalIso) ? toUtcIso(localValue) : null;
-}
-
 function serverMessage(e: ApiError): string | null {
   const body = e.body as { _server_messages?: string; exception?: string } | undefined;
   try {
@@ -97,26 +128,38 @@ function serverMessage(e: ApiError): string | null {
         return (m.message || "").replace(/<[^>]+>/g, "").trim() || null;
       }
     }
-  } catch {
-    /* fall through */
-  }
+  } catch { /* fall through */ }
   return null;
 }
-
 function handleErr(e: unknown) {
   armedApprove.value = false;
   armedReject.value = false;
-  if (e instanceof ApiError) {
-    message.value = serverMessage(e) || t("approvals.action_failed");
-  } else {
-    // fetch rejected → no connection. Approvals never queue.
-    message.value = t("approvals.online_only");
+  message.value = e instanceof ApiError ? serverMessage(e) || t("approvals.action_failed") : t("approvals.online_only");
+}
+
+/** Persist any edited times to the raw checkins (cooperheat re-derives the pairs). */
+async function saveTimes() {
+  const edits = dirtyEdits();
+  if (!edits.length) return;
+  await store.updateCheckins(name, edits);
+  seedEdits();
+}
+
+async function onSaveTimes() {
+  busy.value = true;
+  message.value = null;
+  try {
+    await saveTimes();
+    message.value = t("approvals.times_saved");
+  } catch (e) {
+    handleErr(e);
+  } finally {
+    busy.value = false;
   }
 }
 
 async function onApprove() {
   if (!d.value) return;
-  // First tap arms the confirm; second tap commits.
   if (!armedApprove.value) {
     armedApprove.value = true;
     armedReject.value = false;
@@ -125,21 +168,16 @@ async function onApprove() {
   busy.value = true;
   message.value = null;
   try {
-    const res = await store.approve(
-      d.value.name,
-      changed(editedIn.value, d.value.in_time),
-      changed(editedOut.value, d.value.out_time),
-    );
+    // Persist any time corrections first (multi-pair), then advance the workflow.
+    await saveTimes();
+    const res = await store.approve(d.value.name);
     armedApprove.value = false;
     if (res.workflow_state === "Approved") {
       message.value = t("approvals.fully_approved");
       window.setTimeout(() => router.replace("/approvals"), 1000);
     } else {
-      // Advanced one level — refresh in place so the user sees the new level
-      // and can continue the chain (it is NOT "stuck"; it needs the next approval).
       await store.loadDetail(name);
-      editedIn.value = toLocalInput(store.detail?.in_time ?? null);
-      editedOut.value = toLocalInput(store.detail?.out_time ?? null);
+      seedEdits();
       message.value = t("approvals.advanced");
     }
   } catch (e) {
@@ -177,7 +215,7 @@ async function onReject() {
     <section v-if="d" class="ad">
       <Card>
         <h2 class="ad__name">{{ d.employee_name || d.employee }}</h2>
-        <p class="ad__date">{{ d.attendance_date || '—' }}</p>
+        <p class="ad__date">{{ d.attendance_date || '—' }}<span v-if="d.department"> · {{ d.department }}</span></p>
         <div class="ad__chips">
           <Chip :variant="approvalVariant(d.workflow_state)">{{ d.workflow_state }}</Chip>
           <Chip v-if="isPending" variant="neutral">{{ t('approvals.level_of', { n: d.current_approval_level || 1 }) }}</Chip>
@@ -187,20 +225,37 @@ async function onReject() {
         </p>
       </Card>
 
-      <Card>
-        <div class="ad__times">
-          <label class="ad__field">
-            <span class="ad__label">{{ t('approvals.in_time') }}</span>
-            <input type="datetime-local" v-model="editedIn" :disabled="!canAct" />
-          </label>
-          <label class="ad__field">
-            <span class="ad__label">{{ t('approvals.out_time') }}</span>
-            <input type="datetime-local" v-model="editedOut" :disabled="!canAct" />
-          </label>
+      <!-- Multi-site: one editable IN/OUT pair per site -->
+      <Card v-if="hasCheckins">
+        <h3 class="ad__h3">{{ t('approvals.checkin_pairs') }}</h3>
+        <div v-for="(p, i) in pairs" :key="p.id" class="ad__pair">
+          <div class="ad__pair-head">
+            <span class="ad__pair-site">{{ p.project || t('approvals.pair', { n: i + 1 }) }}</span>
+            <span class="ad__pair-hours">{{ pairHours(p).toFixed(2) }}h</span>
+          </div>
+          <div class="ad__times">
+            <label class="ad__field">
+              <span class="ad__label">{{ t('approvals.in_time') }}</span>
+              <input v-if="p.inName" type="datetime-local" v-model="editedTimes[p.inName]" :disabled="!canAct" />
+              <span v-else class="ad__missing">—</span>
+            </label>
+            <label class="ad__field">
+              <span class="ad__label">{{ t('approvals.out_time') }}</span>
+              <input v-if="p.outName" type="datetime-local" v-model="editedTimes[p.outName]" :disabled="!canAct" />
+              <span v-else class="ad__missing">{{ t('approvals.open_pair') }}</span>
+            </label>
+          </div>
         </div>
-        <p class="ad__hours">
-          {{ t('approvals.working_hours') }}: <strong>{{ workedHours.toFixed(2) }}</strong>
-        </p>
+        <p class="ad__hours">{{ t('approvals.working_hours') }}: <strong>{{ totalHours.toFixed(2) }}</strong></p>
+        <AppButton v-if="canAct" variant="secondary" block :disabled="busy" @click="onSaveTimes">
+          {{ t('approvals.save_times') }}
+        </AppButton>
+      </Card>
+
+      <!-- Legacy / no checkins: show the single in/out read-only -->
+      <Card v-else>
+        <p class="ad__hours">{{ t('approvals.working_hours') }}: <strong>{{ (d.working_hours || 0).toFixed(2) }}</strong></p>
+        <p class="ad__missing">{{ t('approvals.no_checkins') }}</p>
       </Card>
 
       <p v-if="expired" class="ad__locked">{{ t('approvals.expired_locked') }}</p>
@@ -234,7 +289,13 @@ async function onReject() {
 .ad__chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .ad__approver { margin: 12px 0 0; font-size: 13px; color: var(--ink-secondary); }
 .ad__approver strong { color: var(--ink-primary); }
-.ad__times { display: flex; flex-direction: column; gap: 12px; }
+.ad__h3 { font-family: var(--font-display); font-weight: 400; font-size: 16px; margin: 0 0 10px; }
+.ad__pair { padding: 10px 0; border-top: 1px solid var(--hairline); }
+.ad__pair:first-of-type { border-top: 0; padding-top: 0; }
+.ad__pair-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.ad__pair-site { font-size: 14px; font-weight: 600; color: var(--ink-primary); }
+.ad__pair-hours { font-family: var(--font-mono); font-size: 13px; color: var(--ink-secondary); }
+.ad__times { display: flex; flex-direction: column; gap: 10px; }
 .ad__field { display: flex; flex-direction: column; gap: 6px; }
 .ad__label { font-size: 12px; color: var(--ink-secondary); text-transform: uppercase; letter-spacing: .04em; }
 .ad__field input {
@@ -242,7 +303,8 @@ async function onReject() {
   border-radius: var(--r-md); background: var(--bg-surface); color: var(--ink-primary);
 }
 .ad__field input:disabled { opacity: .6; }
-.ad__hours { margin: 12px 0 0; font-size: 14px; color: var(--ink-secondary); }
+.ad__missing { color: var(--ink-tertiary); font-size: 13px; padding: 10px 0; }
+.ad__hours { margin: 12px 0 10px; font-size: 14px; color: var(--ink-secondary); }
 .ad__hours strong { color: var(--ink-primary); font-family: var(--font-mono); }
 .ad__locked {
   padding: 12px 14px; border-radius: var(--r-md);

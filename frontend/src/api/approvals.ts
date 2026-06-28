@@ -18,6 +18,26 @@ export interface ApprovalRow {
   window_expires_at: string | null;
   /** Detail-only. */
   department?: string | null;
+  site_hours?: SiteHour[];
+  checkins?: DayCheckin[];
+}
+
+/** A derived per-site pair (Attendance Site Hours) — display. */
+export interface SiteHour {
+  project: string | null;
+  project_name: string | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  hours: number;
+}
+
+/** A raw Employee Checkin log for the day — the editable source of truth. */
+export interface DayCheckin {
+  name: string;
+  log_type: "IN" | "OUT";
+  time: string | null;
+  project: string | null;
+  project_name: string | null;
 }
 
 export interface ApprovalSummary {
@@ -51,5 +71,10 @@ export const approvalsApi = {
     apiCall<ApprovalActionResult>("POST", "fatehhr.api.approvals.reject", {
       name,
       reason: reason ?? null,
+    }),
+  updateCheckinTimes: (name: string, edits: { checkin: string; time: string }[]) =>
+    apiCall<ApprovalRow>("POST", "fatehhr.api.approvals.update_checkin_times", {
+      name,
+      edits: JSON.stringify(edits),
     }),
 };
