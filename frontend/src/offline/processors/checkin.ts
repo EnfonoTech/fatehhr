@@ -14,6 +14,7 @@ interface CheckinPayload {
   timestamp: string;
   client_id?: string;
   activity_log?: string | null;
+  project_site?: string | null;
 }
 
 registerProcessor("checkin", async (entry: QueueRecord) => {
@@ -34,5 +35,6 @@ registerProcessor("checkin", async (entry: QueueRecord) => {
     timestamp: p.timestamp,
     client_id: p.client_id,
     activity_log: p.activity_log ?? null,
+    project_site: p.project_site ?? null,
   });
 });

@@ -9,6 +9,7 @@ import MapPreview from "@/components/MapPreview.vue";
 import PhotoSlot from "@/components/PhotoSlot.vue";
 import BottomNav from "@/components/BottomNav.vue";
 import { useCheckinStore } from "@/stores/checkin";
+import { checkinApi, type SiteOption } from "@/api/checkin";
 import { useSettingsStore } from "@/stores/settings";
 import { useTasksStore } from "@/stores/tasks";
 import { getCurrentCoords, hapticMedium, hapticError } from "@/app/frappe";
@@ -27,6 +28,10 @@ const address = ref<string | null>(null);
 const task = ref<string | null>(null);
 const selfiePhotoId = ref<string | null>(null);
 const activityLog = ref<string | null>(null);
+// Cooperheat multi-site: allocated sites for the IN picker; open IN's site for OUT.
+const siteOptions = ref<SiteOption[]>([]);
+const site = ref<string | null>(null);
+const openSiteName = ref<string | null>(null);
 const busy = ref(false);
 const message = ref<string | null>(null);
 const geofence = ref<"disabled" | "inside" | "outside" | "unknown">("unknown");
@@ -36,6 +41,15 @@ const timerMode = computed(() => settings.isTimerBased);
 onMounted(async () => {
   await settings.refresh();
   await store.refreshToday();
+  // Cooperheat multi-site: sites for the IN picker; open IN's site for OUT label.
+  try {
+    siteOptions.value = await checkinApi.assignedSites();
+    if (siteOptions.value.length === 1) site.value = siteOptions.value[0].project;
+  } catch { /* offline / non-cooperheat → no picker */ }
+  try {
+    const oc = await checkinApi.openCheckin();
+    openSiteName.value = oc?.project_name ?? null;
+  } catch { /* offline */ }
   if (timerMode.value) {
     await tasks.load();
     // If a timer is already running, default the pick to that task so the
@@ -81,6 +95,12 @@ async function submitCheckinMode() {
     message.value = t("checkin.selfie_required");
     return;
   }
+  // Multi-site: a project site is required on check-IN when sites are allocated.
+  if (nextLogType.value === "IN" && siteOptions.value.length && !site.value) {
+    await hapticError();
+    message.value = t("checkin.site_required");
+    return;
+  }
 
   // Re-fetch coords at tap time if we don't have them yet.
   // Fixes: GPS permission granted late, or initial fetch failed silently.
@@ -114,6 +134,7 @@ async function submitCheckinMode() {
       task: task.value,
       selfie_photo_id: selfiePhotoId.value,
       activity_log: nextLogType.value === "OUT" ? activityLog.value : null,
+      project_site: nextLogType.value === "IN" ? site.value : null,
     });
     await hapticMedium();
     message.value = res.mode === "online" ? t("checkin.done") : t("checkin.queued");
@@ -199,6 +220,19 @@ async function submitTimerMode() {
 
     <p class="checkin__geofence" :class="`is-${geofence}`">
       {{ t(`checkin.geofence.${geofence}`) }}
+    </p>
+
+    <!-- Multi-site: pick the site on check-IN -->
+    <section v-if="nextLogType === 'IN' && siteOptions.length" class="checkin__site">
+      <h3>{{ t('checkin.site') }}</h3>
+      <select v-model="site" class="checkin__site-select">
+        <option :value="null" disabled>{{ t('checkin.site_select') }}</option>
+        <option v-for="s in siteOptions" :key="s.project" :value="s.project">{{ s.project_name }}</option>
+      </select>
+    </section>
+    <!-- Check-OUT: site is fixed to the open check-in, shown read-only -->
+    <p v-else-if="nextLogType === 'OUT' && openSiteName" class="checkin__site-readonly">
+      {{ t('checkin.site') }}: <strong>{{ openSiteName }}</strong>
     </p>
 
     <section v-if="nextLogType === 'OUT'" class="checkin__activity">
@@ -289,6 +323,15 @@ async function submitTimerMode() {
 .checkin__activity-input:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
+.checkin__site h3 { font-family: var(--font-display); font-size: 17px; margin: 16px 0 8px; font-weight: 400; }
+.checkin__site-select {
+  width: 100%; box-sizing: border-box; padding: 12px; font: inherit;
+  color: var(--ink-primary); background: var(--bg-surface);
+  border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
+.checkin__site-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.checkin__site-readonly { margin: 12px 0 0; font-size: 14px; color: var(--ink-secondary); }
+.checkin__site-readonly strong { color: var(--ink-primary); }
 .checkin__msg { color: var(--ink-secondary); font-size: 13px; margin: 8px 0 0; text-align: center; }
 .checkin__history-link {
   display: block; margin: 24px 0 0; color: var(--ink-secondary); text-align: center;

@@ -11,6 +11,7 @@ export interface CheckinRow {
   custom_selfie: string | null;
   custom_geofence_status: "disabled" | "inside" | "outside" | "unknown";
   activity_log?: string | null;
+  custom_project?: string | null;
   employee_user?: string;
   /** Local marker — true for queued offline rows that aren't on the server yet. */
   __pending?: boolean;
@@ -20,6 +21,18 @@ export interface TodaySummary {
   worked_seconds: number;
   /** ISO-UTC of the last open IN (no matching OUT yet). null = no open pair. */
   open_since: string | null;
+}
+
+export interface SiteOption {
+  project: string;
+  project_name: string;
+}
+
+export interface OpenCheckin {
+  name?: string;
+  time?: string;
+  custom_project?: string | null;
+  project_name?: string | null;
 }
 
 export const checkinApi = {
@@ -33,6 +46,7 @@ export const checkinApi = {
     timestamp: string;
     client_id?: string;
     activity_log?: string | null;
+    project_site?: string | null;
   }) => apiCall<CheckinRow>("POST", "fatehhr.api.checkin.create", p),
 
   list: (p: { from_date?: string; to_date?: string; page?: number; page_size?: number }) =>
@@ -40,4 +54,10 @@ export const checkinApi = {
 
   todaySummary: () =>
     apiCall<TodaySummary>("POST", "fatehhr.api.checkin.today_summary", {}),
+
+  assignedSites: (date?: string) =>
+    apiCall<SiteOption[]>("POST", "fatehhr.api.checkin.assigned_sites", { date }),
+
+  openCheckin: () =>
+    apiCall<OpenCheckin>("POST", "fatehhr.api.checkin.open_checkin", {}),
 };

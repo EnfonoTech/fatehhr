@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TopAppBar from "@/components/TopAppBar.vue";
@@ -15,8 +15,20 @@ const router = useRouter();
 const store = useApprovalsStore();
 
 const tab = ref<"pending" | "done">("pending");
+const q = ref("");
 const now = ref(Date.now());
 let tick: number | null = null;
+
+function matches(r: ApprovalRow): boolean {
+  const s = q.value.trim().toLowerCase();
+  if (!s) return true;
+  return (
+    (r.employee_name || "").toLowerCase().includes(s) ||
+    (r.employee || "").toLowerCase().includes(s)
+  );
+}
+const filteredPending = computed(() => store.pending.filter(matches));
+const filteredDone = computed(() => store.done.filter(matches));
 
 onMounted(async () => {
   await store.loadSummary();
@@ -91,9 +103,11 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
       </button>
     </div>
 
+    <input v-model="q" class="appr__search" type="search" :placeholder="t('approvals.search')" />
+
     <!-- PENDING -->
     <template v-if="tab === 'pending'">
-      <button v-for="r in store.pending" :key="r.name" class="ac" @click="open(r)">
+      <button v-for="r in filteredPending" :key="r.name" class="ac" @click="open(r)">
         <span class="ac__avatar">{{ initials(r.employee_name, r.employee) }}</span>
         <span class="ac__body">
           <span class="ac__top">
@@ -113,7 +127,7 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
         </span>
         <Icon name="chevron-right" :size="18" class="ac__chev" />
       </button>
-      <div v-if="!store.loading && !store.pending.length" class="appr__empty">
+      <div v-if="!store.loading && !filteredPending.length" class="appr__empty">
         <Icon name="approvals" :size="40" />
         <p>{{ t('approvals.empty_pending') }}</p>
       </div>
@@ -121,7 +135,7 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
 
     <!-- DONE -->
     <template v-else>
-      <button v-for="r in store.done" :key="r.name" class="ac" @click="open(r)">
+      <button v-for="r in filteredDone" :key="r.name" class="ac" @click="open(r)">
         <span class="ac__avatar">{{ initials(r.employee_name, r.employee) }}</span>
         <span class="ac__body">
           <span class="ac__top">
@@ -135,7 +149,7 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
         </span>
         <Icon name="chevron-right" :size="18" class="ac__chev" />
       </button>
-      <div v-if="!store.done.length" class="appr__empty">
+      <div v-if="!filteredDone.length" class="appr__empty">
         <Icon name="approvals" :size="40" />
         <p>{{ t('approvals.empty_done') }}</p>
       </div>
@@ -147,6 +161,13 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
 
 <style scoped>
 .appr { padding: 0 var(--page-gutter) 120px; }
+.appr__search {
+  width: 100%; box-sizing: border-box; margin: 0 0 14px;
+  padding: 11px 14px; font: inherit; font-size: 14px;
+  background: var(--bg-sunk); border: 1px solid var(--hairline);
+  border-radius: var(--r-md); color: var(--ink-primary);
+}
+.appr__search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
 /* Segmented control */
 .seg {

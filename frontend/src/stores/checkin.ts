@@ -14,6 +14,8 @@ export interface CheckinSubmit {
   selfie_photo_id: string | null;
   /** Cooperheat daily activity log — only set on check-OUT. */
   activity_log?: string | null;
+  /** Cooperheat project site — picked on IN, carried (read-only) on OUT. */
+  project_site?: string | null;
 }
 
 // Persist the "what state is the user in right now?" slice across app kills.
@@ -141,6 +143,7 @@ export const useCheckinStore = defineStore("checkin", {
             timestamp,
             client_id: clientId,
             activity_log: payload.activity_log ?? null,
+            project_site: payload.project_site ?? null,
           });
           this.currentStatus = row.log_type;
           this.currentTask = row.custom_task;
@@ -162,6 +165,7 @@ export const useCheckinStore = defineStore("checkin", {
         timestamp,
         client_id: clientId,
         activity_log: payload.activity_log ?? null,
+        project_site: payload.project_site ?? null,
       }, effectiveImages);
 
       this.currentStatus = payload.log_type;

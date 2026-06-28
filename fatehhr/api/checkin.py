@@ -67,6 +67,7 @@ def create(
 	timestamp: str | None = None,
 	client_id: str | None = None,
 	activity_log: str | None = None,
+	project_site: str | None = None,
 ) -> dict:
 	"""Create an Employee Checkin (IN/OUT) with optional GPS + task + selfie.
 
@@ -122,6 +123,11 @@ def create(
 		"custom_geofence_status": gf_status,
 		"custom_client_id": client_id or None,
 	})
+	# Project site (cooperheat `custom_project` on Employee Checkin) — picked at
+	# check-IN from the employee's allocated sites; on check-OUT the client passes
+	# the open check-in's site (shown read-only). Guarded: no-op without cooperheat.
+	if project_site and frappe.get_meta("Employee Checkin").has_field("custom_project"):
+		doc.custom_project = project_site
 	# Daily activity log is a cooperheat-owned field on Employee Checkin, shown
 	# only on check-OUT. Write it only when the field exists (absent on demo)
 	# and only for OUT, so this stays a no-op on tenants without cooperheat.
@@ -168,7 +174,12 @@ def create(
 		"custom_selfie": selfie_file_url,
 		"custom_geofence_status": gf_status,
 		"activity_log": activity_log,
+		"custom_project": project_site,
 	}
+
+
+def _checkin_has(field: str) -> bool:
+	return frappe.get_meta("Employee Checkin").has_field(field)
 
 
 def _row_as_response(name: str) -> dict:
@@ -177,12 +188,81 @@ def _row_as_response(name: str) -> dict:
 		"custom_task", "custom_latitude", "custom_longitude",
 		"custom_location_address", "custom_selfie", "custom_geofence_status",
 	]
-	if frappe.get_meta("Employee Checkin").has_field("activity_log"):
+	if _checkin_has("activity_log"):
 		fields.append("activity_log")
+	if _checkin_has("custom_project"):
+		fields.append("custom_project")
 	r = frappe.db.get_value("Employee Checkin", name, fields, as_dict=True) or {}
 	if r.get("time"):
 		r["time"] = _naive_site_to_utc_iso(r["time"])
 	return r
+
+
+@frappe.whitelist()
+def assigned_sites(date: str | None = None) -> list[dict]:
+	"""Project sites allocated in the employee's active Shift Assignment — for the
+	check-in site picker. Returns [] (no-op) on tenants without the cooperheat
+	multi-site schema. Delegates to cooperheat's get_assigned_projects when present.
+	"""
+	from frappe.utils import getdate, today
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if not employee:
+		return []
+	d = getdate(date) if date else getdate(today())
+	projects: list[str] = []
+	try:
+		from cooperheat.cooperheat.api.api import get_assigned_projects
+		projects = get_assigned_projects(employee, str(d)) or []
+	except Exception:
+		# cooperheat absent or shape changed → fall back to the SA child if present
+		if frappe.db.exists("DocType", "Shift Assignment Project"):
+			sa = frappe.db.get_value(
+				"Shift Assignment",
+				{"employee": employee, "docstatus": 1, "status": "Active", "start_date": ["<=", d]},
+				"name", order_by="start_date desc",
+			)
+			if sa:
+				projects = frappe.get_all(
+					"Shift Assignment Project",
+					filters={"parent": sa, "parentfield": "custom_project_sites"},
+					pluck="project",
+				)
+	out = []
+	for p in projects:
+		out.append({"project": p, "project_name": frappe.db.get_value("Project", p, "project_name") or p})
+	return out
+
+
+@frappe.whitelist()
+def open_checkin() -> dict:
+	"""The current open IN (no matching OUT yet) for today + its site, so the
+	check-OUT screen can show the site read-only. {} if none."""
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if not employee:
+		return {}
+	from frappe.utils import today
+	has_proj = _checkin_has("custom_project")
+	rows = frappe.get_all(
+		"Employee Checkin",
+		filters={"employee": employee, "time": ["between", [today() + " 00:00:00", today() + " 23:59:59"]]},
+		fields=["name", "log_type", "time"] + (["custom_project"] if has_proj else []),
+		order_by="time asc",
+	)
+	open_in = None
+	for r in rows:
+		if r.log_type == "IN":
+			open_in = r
+		elif r.log_type == "OUT":
+			open_in = None
+	if not open_in:
+		return {}
+	proj = open_in.get("custom_project") if has_proj else None
+	return {
+		"name": open_in.name,
+		"time": _naive_site_to_utc_iso(open_in.time),
+		"custom_project": proj,
+		"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+	}
 
 
 @frappe.whitelist()
