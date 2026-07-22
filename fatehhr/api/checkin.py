@@ -66,14 +66,20 @@ def _naive_site_to_utc_iso(dt):
 	return utc_dt.isoformat().replace("+00:00", "Z")
 
 
-def _guard_not_future(ts):
-	"""Reject a punch time dated in the future (see _FUTURE_SKEW_MINUTES note).
+def _clamp_future(ts):
+	"""Clamp a future-dated punch to server-now instead of rejecting it.
 
-	Upper-bound only: the past is intentionally unbounded so an offline check-in
-	that drains hours/days late still lands with its real (older) `time`.
+	A punch time in the future is almost always device-clock skew — the client
+	time-picker's max is "now", so a future value is never the employee's intent.
+	An earlier version *threw* here, which rejected every check-in/out from any
+	device whose clock ran more than a couple of minutes ahead (observed in
+	production: 36 consecutive HTTP 417s). Clamping to server-now keeps the punch
+	working while sanitising the bad clock. The past is left untouched so a late
+	offline-queue drain still lands with its real (older) `time`.
 	"""
 	if ts and ts > add_to_date(now_datetime(), minutes=_FUTURE_SKEW_MINUTES):
-		frappe.throw(frappe._("Check-in time cannot be in the future."))
+		return now_datetime()
+	return ts
 
 
 @frappe.whitelist()
@@ -130,7 +136,7 @@ def create(
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
 	ts = _parse_client_ts(timestamp) or now_datetime()
-	_guard_not_future(ts)
+	ts = _clamp_future(ts)
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,
