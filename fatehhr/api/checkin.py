@@ -2,7 +2,17 @@ from datetime import timezone
 
 import frappe
 from dateutil.parser import isoparse
-from frappe.utils import now_datetime, get_system_timezone
+from frappe.utils import add_to_date, now_datetime, get_system_timezone
+
+# Employee-adjusted punch time is bounded to the last 24h on the client (the
+# check-in time-picker's min/max). The server intentionally does NOT re-enforce
+# that 24h lower bound — an offline punch may legitimately drain hours or days
+# late, and its stored `time` is the real (older) punch moment, so a server
+# clamp against "now" would wrongly reject valid queued check-ins. The server
+# guards only the UPPER bound: a punch may never be dated in the future (clock
+# abuse / a picker bypass). This small tolerance (minutes) absorbs device-clock
+# drift between phone and server.
+_FUTURE_SKEW_MINUTES = 2
 
 try:
 	from zoneinfo import ZoneInfo
@@ -54,6 +64,16 @@ def _naive_site_to_utc_iso(dt):
 	utc_dt = dt.astimezone(timezone.utc)
 	# isoformat → "2026-04-19T15:25:16+00:00"; canonicalise to …Z
 	return utc_dt.isoformat().replace("+00:00", "Z")
+
+
+def _guard_not_future(ts):
+	"""Reject a punch time dated in the future (see _FUTURE_SKEW_MINUTES note).
+
+	Upper-bound only: the past is intentionally unbounded so an offline check-in
+	that drains hours/days late still lands with its real (older) `time`.
+	"""
+	if ts and ts > add_to_date(now_datetime(), minutes=_FUTURE_SKEW_MINUTES):
+		frappe.throw(frappe._("Check-in time cannot be in the future."))
 
 
 @frappe.whitelist()
@@ -110,6 +130,7 @@ def create(
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
 	ts = _parse_client_ts(timestamp) or now_datetime()
+	_guard_not_future(ts)
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,

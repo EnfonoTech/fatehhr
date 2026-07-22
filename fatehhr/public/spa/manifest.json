@@ -1,10 +1,10 @@
 {
-  "name": "Fateh HR",
-  "short_name": "Fateh HR",
+  "name": "Cooperheat",
+  "short_name": "Cooperheat",
   "start_url": "/assets/fatehhr/spa/index.html",
   "display": "standalone",
   "background_color": "#FAF7F2",
-  "theme_color": "#2E5D5A",
+  "theme_color": "#CE0A0D",
   "icons": [
     {
       "src": "/assets/fatehhr/spa/icons/icon-192.png",

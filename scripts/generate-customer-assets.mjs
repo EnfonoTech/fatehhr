@@ -61,6 +61,44 @@ async function ensureDir(p) {
   await fs.mkdir(p, { recursive: true });
 }
 
+// Real customer logo, if provided at customers/logo.<slug>.png. When absent we
+// fall back to the generated khatam glyph, so tenants without a supplied logo
+// still build. Provide a high-res square PNG (≥512px, transparent background).
+const slug = (process.env.CUSTOMER_SLUG || "").trim();
+const logoSrc = slug ? path.join(repoRoot, "customers", `logo.${slug}.png`) : null;
+let useLogo = false;
+
+async function logoExists() {
+  if (!logoSrc) return false;
+  try {
+    await fs.access(logoSrc);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Foreground glyph for icons/splash: the customer logo, else the generated
+// khatam star. Returns sharp composite descriptors, always centered.
+//
+// The supplied logo (customers/logo.<slug>.png) is expected to be PRE-SAFE-ZONED
+// — i.e. the artwork already sits within the central ~66% of a square,
+// transparent canvas, exactly like an Android adaptive-icon foreground. We
+// therefore place it at FULL canvas size (no extra shrink); shrinking a
+// pre-padded logo again would leave the glyph tiny inside the launcher mask.
+// Pair it with a matching CUSTOMER_PRIMARY_COLOR so the padding blends into the
+// adaptive background.
+async function glyphInputs(size) {
+  if (useLogo) {
+    const buf = await sharp(logoSrc)
+      .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+    return [{ input: buf, gravity: "center" }];
+  }
+  return [{ input: khatamSvg(size, ink), gravity: "center" }];
+}
+
 async function writeAdaptiveIcon(dir, size) {
   await ensureDir(dir);
   // Solid accent background
@@ -70,11 +108,11 @@ async function writeAdaptiveIcon(dir, size) {
     .png()
     .toFile(path.join(dir, "ic_launcher_background.png"));
 
-  // Foreground: khatam glyph on transparent
+  // Foreground: logo (or khatam glyph) on transparent
   await sharp({
     create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .composite([{ input: khatamSvg(size, ink) }])
+    .composite(await glyphInputs(size))
     .png()
     .toFile(path.join(dir, "ic_launcher_foreground.png"));
 
@@ -82,7 +120,7 @@ async function writeAdaptiveIcon(dir, size) {
   await sharp({
     create: { width: size, height: size, channels: 4, background: accent },
   })
-    .composite([{ input: khatamSvg(size, ink) }])
+    .composite(await glyphInputs(size))
     .png()
     .toFile(path.join(dir, "ic_launcher.png"));
 
@@ -93,7 +131,7 @@ async function writeAdaptiveIcon(dir, size) {
   await sharp({
     create: { width: size, height: size, channels: 4, background: accent },
   })
-    .composite([{ input: khatamSvg(size, ink) }, { input: mask, blend: "dest-in" }])
+    .composite([...(await glyphInputs(size)), { input: mask, blend: "dest-in" }])
     .png()
     .toFile(path.join(dir, "ic_launcher_round.png"));
 }
@@ -105,7 +143,7 @@ async function writeSplash() {
   await sharp({
     create: { width: size, height: size, channels: 4, background: accent },
   })
-    .composite([{ input: khatamSvg(size, ink), gravity: "center" }])
+    .composite(await glyphInputs(size))
     .png()
     .toFile(path.join(drawableDir, "splash.png"));
 }
@@ -127,6 +165,8 @@ async function writeIcLauncherBackground() {
 }
 
 async function main() {
+  useLogo = await logoExists();
+  console.log(useLogo ? `🖼️  Using logo ${path.relative(repoRoot, logoSrc)}` : "✏️  No customer logo — using generated khatam glyph");
   for (const [dir, size] of Object.entries(densities)) {
     await writeAdaptiveIcon(path.join(resDir, dir), size);
   }

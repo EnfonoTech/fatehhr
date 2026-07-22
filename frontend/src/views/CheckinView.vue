@@ -32,15 +32,32 @@ const activityLog = ref<string | null>(null);
 const siteOptions = ref<SiteOption[]>([]);
 const site = ref<string | null>(null);
 const openSiteName = ref<string | null>(null);
+// Employee time-adjust: local-wall-clock "YYYY-MM-DDTHH:mm" for <input datetime-local>.
+// Defaults to now; the employee may backdate the punch up to 24h.
+const punchTime = ref<string>("");
 const busy = ref(false);
 const message = ref<string | null>(null);
 const geofence = ref<"disabled" | "inside" | "outside" | "unknown">("unknown");
 
 const timerMode = computed(() => settings.isTimerBased);
 
+// --- Employee time-adjust (24h window) -------------------------------------
+// <input datetime-local> speaks local wall-clock with no timezone. Format/parse
+// against the device's local tz, then convert the chosen value to ISO-UTC for
+// the server (which stores site-local; _parse_client_ts handles the offset).
+function toLocalInput(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// Lower bound = 24h before now (spec §7 fixed 24h employee window); upper = now.
+const punchMin = computed(() => toLocalInput(new Date(Date.now() - 24 * 60 * 60 * 1000)));
+const punchMax = computed(() => toLocalInput(new Date()));
+
 onMounted(async () => {
   await settings.refresh();
   await store.refreshToday();
+  // Default the punch time to now; the employee may backdate up to 24h.
+  punchTime.value = toLocalInput(new Date());
   // Cooperheat multi-site: sites for the IN picker; open IN's site for OUT label.
   try {
     siteOptions.value = await checkinApi.assignedSites();
@@ -102,6 +119,29 @@ async function submitCheckinMode() {
     return;
   }
 
+  // Employee time-adjust: send the chosen punch time only when the employee
+  // actually backdated it (>1min from now); otherwise let the server stamp the
+  // real tap moment. Enforce the 24h lower bound + no-future here too (the
+  // input's min/max is not honoured by every mobile keyboard).
+  let adjustedIso: string | null = null;
+  if (punchTime.value) {
+    const chosenMs = new Date(punchTime.value).getTime();
+    const nowMs = Date.now();
+    if (Number.isNaN(chosenMs)) {
+      await hapticError();
+      message.value = t("checkin.time_out_of_range");
+      return;
+    }
+    if (Math.abs(nowMs - chosenMs) > 60_000) {
+      if (chosenMs > nowMs + 120_000 || chosenMs < nowMs - 24 * 60 * 60 * 1000) {
+        await hapticError();
+        message.value = t("checkin.time_out_of_range");
+        return;
+      }
+      adjustedIso = new Date(chosenMs).toISOString();
+    }
+  }
+
   // Re-fetch coords at tap time if we don't have them yet.
   // Fixes: GPS permission granted late, or initial fetch failed silently.
   if (lat.value == null || lng.value == null) {
@@ -135,6 +175,7 @@ async function submitCheckinMode() {
       selfie_photo_id: selfiePhotoId.value,
       activity_log: nextLogType.value === "OUT" ? activityLog.value : null,
       project_site: nextLogType.value === "IN" ? site.value : null,
+      adjusted_time: adjustedIso,
     });
     await hapticMedium();
     message.value = res.mode === "online" ? t("checkin.done") : t("checkin.queued");
@@ -143,6 +184,7 @@ async function submitCheckinMode() {
     }
     selfiePhotoId.value = null;
     activityLog.value = null;
+    punchTime.value = toLocalInput(new Date());
     window.setTimeout(() => {
       if (router.currentRoute.value.name === "checkin") {
         router.replace("/");
@@ -234,6 +276,19 @@ async function submitTimerMode() {
     <p v-else-if="nextLogType === 'OUT' && openSiteName" class="checkin__site-readonly">
       {{ t('checkin.site') }}: <strong>{{ openSiteName }}</strong>
     </p>
+
+    <!-- Employee time-adjust: backdate the punch up to 24h (checkin mode only) -->
+    <section v-if="!timerMode" class="checkin__time">
+      <h3>{{ t('checkin.time') }}</h3>
+      <p class="checkin__time-hint">{{ t('checkin.time_hint') }}</p>
+      <input
+        v-model="punchTime"
+        type="datetime-local"
+        class="checkin__time-input"
+        :min="punchMin"
+        :max="punchMax"
+      />
+    </section>
 
     <section v-if="nextLogType === 'OUT'" class="checkin__activity">
       <h3>{{ t('checkin.activity_log') }}</h3>
@@ -332,6 +387,14 @@ async function submitTimerMode() {
 .checkin__site-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .checkin__site-readonly { margin: 12px 0 0; font-size: 14px; color: var(--ink-secondary); }
 .checkin__site-readonly strong { color: var(--ink-primary); }
+.checkin__time h3 { font-family: var(--font-display); font-size: 17px; margin: 16px 0 4px; font-weight: 400; }
+.checkin__time-hint { color: var(--ink-secondary); font-size: 13px; margin: 0 0 8px; }
+.checkin__time-input {
+  width: 100%; box-sizing: border-box; padding: 12px; font: inherit;
+  color: var(--ink-primary); background: var(--bg-surface);
+  border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
+.checkin__time-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .checkin__msg { color: var(--ink-secondary); font-size: 13px; margin: 8px 0 0; text-align: center; }
 .checkin__history-link {
   display: block; margin: 24px 0 0; color: var(--ink-secondary); text-align: center;

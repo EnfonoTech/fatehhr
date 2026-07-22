@@ -16,6 +16,9 @@ export interface CheckinSubmit {
   activity_log?: string | null;
   /** Cooperheat project site — picked on IN, carried (read-only) on OUT. */
   project_site?: string | null;
+  /** Employee-adjusted punch time (ISO-UTC). Bounded to the last 24h on the
+   *  picker; when unset the tap moment (now) is used. */
+  adjusted_time?: string | null;
 }
 
 // Persist the "what state is the user in right now?" slice across app kills.
@@ -117,7 +120,10 @@ export const useCheckinStore = defineStore("checkin", {
 
     async submit(payload: CheckinSubmit) {
       const sync = useSyncStore();
-      const timestamp = new Date().toISOString();
+      // Employee-adjusted punch time wins when set (picker, bounded 24h back);
+      // otherwise the real tap moment. Either way this becomes the queued
+      // `timestamp`, so the offline drain replays the same intended time.
+      const timestamp = payload.adjusted_time || new Date().toISOString();
       const sessionId = uuid();
       // client_id is the dedupe key the server uses. Same uuid flows through
       // the online call AND the offline queue payload, so if both paths race
