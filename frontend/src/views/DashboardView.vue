@@ -18,6 +18,7 @@ import { useNotificationStore } from "@/stores/notification";
 import { useSettingsStore } from "@/stores/settings";
 import { useSyncStore } from "@/stores/sync";
 import { useApprovalsStore } from "@/stores/approvals";
+import { CUSTOMER_BRAND_NAME } from "virtual:fatehhr-theme";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
 import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 
@@ -175,7 +176,7 @@ onUnmounted(() => {
 <template>
   <main class="dash">
     <header class="dash__head">
-      <h1>{{ t('app.name') }}</h1>
+      <h1>{{ CUSTOMER_BRAND_NAME }}</h1>
       <NotificationBell />
     </header>
     <SyncBar />
