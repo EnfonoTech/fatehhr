@@ -44,6 +44,11 @@ echo "▶ Building PWA for $SLUG ($CUSTOMER_ERP_DOMAIN)"
     pnpm build
 )
 
+echo "▶ Generating branded PWA icons (from customers/logo.$SLUG.png, if present)"
+CUSTOMER_SLUG="$SLUG" \
+  CUSTOMER_PRIMARY_COLOR="$CUSTOMER_PRIMARY_COLOR" \
+  node "$REPO_ROOT/scripts/generate-pwa-icons.mjs"
+
 echo "▶ Copying build output to fatehhr/public/spa/"
 rm -rf "$REPO_ROOT/fatehhr/public/spa"
 mkdir -p "$REPO_ROOT/fatehhr/public/spa"
