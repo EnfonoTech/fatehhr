@@ -42,6 +42,27 @@ export function createAppRouter() {
     routes,
   });
 
+  // Self-heal stale-chunk failures. Routes are lazy import()s; after a new
+  // deploy the chunk hashes change and the old files are removed from the
+  // server. A client running an out-of-date service-worker shell then 404s
+  // when it tries to open a not-yet-loaded route (Attendance / Leave / Expense
+  // "won't open the first time"). On such an error we force ONE hard reload to
+  // the target path so the browser + SW pick up the fresh index and chunks.
+  const RELOAD_KEY = "fatehhr.chunk-reload-once";
+  router.onError((error, to) => {
+    const msg = String((error && (error as Error).message) || error);
+    const isChunkError =
+      /dynamically imported module|Importing a module script failed|Failed to fetch dynamically|error loading dynamically imported/i.test(msg);
+    if (!isChunkError) return;
+    if (sessionStorage.getItem(RELOAD_KEY)) return; // already tried — avoid a loop
+    sessionStorage.setItem(RELOAD_KEY, "1");
+    if (to?.fullPath) window.location.hash = "#" + to.fullPath;
+    window.location.reload();
+  });
+  // Clear the one-shot guard once any navigation succeeds, so a later deploy can
+  // trigger a fresh self-heal.
+  router.afterEach(() => sessionStorage.removeItem(RELOAD_KEY));
+
   router.beforeEach(async (to) => {
     const session = useSessionStore();
     await session.hydrate();
