@@ -75,6 +75,16 @@ const pairs = computed<Pair[]>(() => {
   return out;
 });
 const hasCheckins = computed(() => (d.value?.checkins?.length ?? 0) > 0);
+// Cooperheat-derived per-site pairs (Attendance Site Hours) — shown read-only when
+// there are no raw Employee Checkins behind the record (the common cooperheat case).
+const siteHours = computed(() => d.value?.site_hours ?? []);
+function fmtTime(iso: string | null): string {
+  if (!iso) return "—";
+  const dt = new Date(iso);
+  return Number.isNaN(dt.getTime())
+    ? "—"
+    : dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
 
 function pairHours(p: Pair): number {
   const a = p.inName && editedTimes[p.inName] ? new Date(editedTimes[p.inName]).getTime() : NaN;
@@ -252,10 +262,33 @@ async function onReject() {
         </AppButton>
       </Card>
 
-      <!-- Legacy / no checkins: show the single in/out read-only -->
+      <!-- No raw checkins: show cooperheat-derived site-hours read-only, else empty -->
       <Card v-else>
-        <p class="ad__hours">{{ t('approvals.working_hours') }}: <strong>{{ (d.working_hours || 0).toFixed(2) }}</strong></p>
-        <p class="ad__missing">{{ t('approvals.no_checkins') }}</p>
+        <template v-if="siteHours.length">
+          <h3 class="ad__h3">{{ t('approvals.checkin_pairs') }}</h3>
+          <p class="ad__derived">{{ t('approvals.derived_hours') }}</p>
+          <div v-for="(s, i) in siteHours" :key="i" class="ad__pair">
+            <div class="ad__pair-head">
+              <span class="ad__pair-site">{{ s.project_name || s.project || t('approvals.pair', { n: i + 1 }) }}</span>
+              <span class="ad__pair-hours">{{ s.hours.toFixed(2) }}h</span>
+            </div>
+            <div class="ad__times">
+              <div class="ad__field">
+                <span class="ad__label">{{ t('approvals.in_time') }}</span>
+                <span class="ad__ro">{{ fmtTime(s.check_in_time) }}</span>
+              </div>
+              <div class="ad__field">
+                <span class="ad__label">{{ t('approvals.out_time') }}</span>
+                <span class="ad__ro">{{ fmtTime(s.check_out_time) }}</span>
+              </div>
+            </div>
+          </div>
+          <p class="ad__hours">{{ t('approvals.working_hours') }}: <strong>{{ (d.working_hours || 0).toFixed(2) }}</strong></p>
+        </template>
+        <template v-else>
+          <p class="ad__hours">{{ t('approvals.working_hours') }}: <strong>{{ (d.working_hours || 0).toFixed(2) }}</strong></p>
+          <p class="ad__missing">{{ t('approvals.no_checkins') }}</p>
+        </template>
       </Card>
 
       <p v-if="expired" class="ad__locked">{{ t('approvals.expired_locked') }}</p>
@@ -304,6 +337,8 @@ async function onReject() {
 }
 .ad__field input:disabled { opacity: .6; }
 .ad__missing { color: var(--ink-tertiary); font-size: 13px; padding: 10px 0; }
+.ad__ro { font: inherit; padding: 10px 0; color: var(--ink-primary); font-family: var(--font-mono); font-size: 14px; }
+.ad__derived { margin: -4px 0 10px; font-size: 12.5px; color: var(--ink-tertiary); }
 .ad__hours { margin: 12px 0 10px; font-size: 14px; color: var(--ink-secondary); }
 .ad__hours strong { color: var(--ink-primary); font-family: var(--font-mono); }
 .ad__locked {

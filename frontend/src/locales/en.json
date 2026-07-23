@@ -1,5 +1,7 @@
 {
-  "app": { "name": "Fateh HR" },
+  "app": {
+    "name": "Fateh HR"
+  },
   "login": {
     "title": "Welcome",
     "email": "Work email",
@@ -83,6 +85,7 @@
     "attendance": "Attendance",
     "leave": "Leave",
     "tasks": "Tasks",
+    "expense": "Expense",
     "more": "More"
   },
   "sync": {
@@ -120,7 +123,9 @@
       "outside": "Outside task radius — will be flagged",
       "unknown": "Location unavailable",
       "disabled": "No task radius set"
-    }
+    },
+    "checkin_details": "Check-in details",
+    "checked_in_at": "Checked in at"
   },
   "attendance": {
     "title": "Attendance",
@@ -173,7 +178,8 @@
     "online_only": "Approvals need a connection. Reconnect and try again.",
     "action_failed": "Couldn't complete that. Please try again.",
     "not_yours": "This approval is no longer assigned to you.",
-    "expired_locked": "The approval window has expired — this record was auto-handled."
+    "expired_locked": "The approval window has expired — this record was auto-handled.",
+    "derived_hours": "Recorded site hours (no app check-ins)"
   },
   "leave": {
     "title": "Leave",
@@ -259,13 +265,5 @@
     "delete_one": "Delete",
     "confirm_delete": "Tap again to confirm",
     "type_delete": "Type DELETE to confirm."
-  },
-  "nav": {
-    "home": "Home",
-    "attendance": "Attendance",
-    "leave": "Leave",
-    "tasks": "Tasks",
-    "expense": "Expense",
-    "more": "More"
   }
 }

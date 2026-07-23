@@ -33,6 +33,8 @@ export interface OpenCheckin {
   time?: string;
   custom_project?: string | null;
   project_name?: string | null;
+  /** Selfie captured at check-IN, shown read-only on the check-OUT screen. */
+  custom_selfie?: string | null;
 }
 
 export const checkinApi = {

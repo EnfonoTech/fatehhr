@@ -9,7 +9,8 @@ import MapPreview from "@/components/MapPreview.vue";
 import PhotoSlot from "@/components/PhotoSlot.vue";
 import BottomNav from "@/components/BottomNav.vue";
 import { useCheckinStore } from "@/stores/checkin";
-import { checkinApi, type SiteOption } from "@/api/checkin";
+import { checkinApi, type SiteOption, type OpenCheckin } from "@/api/checkin";
+import { API_BASE } from "@/app/platform";
 import { useSettingsStore } from "@/stores/settings";
 import { useTasksStore } from "@/stores/tasks";
 import { getCurrentCoords, hapticMedium, hapticError } from "@/app/frappe";
@@ -32,6 +33,8 @@ const activityLog = ref<string | null>(null);
 const siteOptions = ref<SiteOption[]>([]);
 const site = ref<string | null>(null);
 const openSiteName = ref<string | null>(null);
+// The open check-IN itself (time + selfie), shown read-only on the check-OUT screen.
+const openCheckin = ref<OpenCheckin | null>(null);
 // Employee time-adjust: local-wall-clock "YYYY-MM-DDTHH:mm" for <input datetime-local>.
 // Defaults to now; the employee may backdate the punch up to 24h.
 const punchTime = ref<string>("");
@@ -65,6 +68,7 @@ onMounted(async () => {
   } catch { /* offline / non-cooperheat → no picker */ }
   try {
     const oc = await checkinApi.openCheckin();
+    openCheckin.value = oc ?? null;
     openSiteName.value = oc?.project_name ?? null;
   } catch { /* offline */ }
   if (timerMode.value) {
@@ -85,6 +89,20 @@ onMounted(async () => {
     }
   }
   geofence.value = classify(null, null, null, lat.value, lng.value);
+});
+
+// Check-OUT screen shows the open check-IN's details (issue: they were hidden).
+const openSelfieUrl = computed(() =>
+  openCheckin.value?.custom_selfie ? `${API_BASE()}${openCheckin.value.custom_selfie}` : null,
+);
+const openInTimeLabel = computed(() => {
+  const iso = openCheckin.value?.time;
+  if (!iso) return null;
+  const dt = new Date(iso);
+  // HH:MM:SS — minute precision hides rapid taps (gotcha #11).
+  return Number.isNaN(dt.getTime())
+    ? null
+    : dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 });
 
 const needsSelfie = computed(() => {
@@ -272,10 +290,17 @@ async function submitTimerMode() {
         <option v-for="s in siteOptions" :key="s.project" :value="s.project">{{ s.project_name }}</option>
       </select>
     </section>
-    <!-- Check-OUT: site is fixed to the open check-in, shown read-only -->
-    <p v-else-if="nextLogType === 'OUT' && openSiteName" class="checkin__site-readonly">
-      {{ t('checkin.site') }}: <strong>{{ openSiteName }}</strong>
-    </p>
+    <!-- Check-OUT: show the open check-IN's details (site, time, selfie) read-only -->
+    <section v-else-if="nextLogType === 'OUT' && openCheckin" class="checkin__openin">
+      <h3>{{ t('checkin.checkin_details') }}</h3>
+      <p v-if="openSiteName" class="checkin__openin-row">
+        {{ t('checkin.site') }}: <strong>{{ openSiteName }}</strong>
+      </p>
+      <p v-if="openInTimeLabel" class="checkin__openin-row">
+        {{ t('checkin.checked_in_at') }}: <strong>{{ openInTimeLabel }}</strong>
+      </p>
+      <img v-if="openSelfieUrl" :src="openSelfieUrl" class="checkin__openin-photo" alt="" />
+    </section>
 
     <!-- Employee time-adjust: backdate the punch up to 24h (checkin mode only) -->
     <section v-if="!timerMode" class="checkin__time">
@@ -350,6 +375,19 @@ async function submitTimerMode() {
 <style scoped>
 .checkin { padding: 0 var(--page-gutter) 120px; }
 .checkin__address { margin: 8px 0 0; color: var(--ink-secondary); }
+.checkin__openin {
+  margin: 16px 0 0; padding: 12px 14px;
+  background: var(--bg-sunk); border-radius: var(--r-md);
+}
+.checkin__openin h3 {
+  font-family: var(--font-display); font-size: 17px; font-weight: 400; margin: 0 0 8px;
+}
+.checkin__openin-row { margin: 4px 0; font-size: 14px; color: var(--ink-secondary); }
+.checkin__openin-row strong { color: var(--ink-primary); }
+.checkin__openin-photo {
+  margin-top: 10px; width: 120px; height: 160px; object-fit: cover;
+  border-radius: var(--r-md); border: 1px solid var(--hairline);
+}
 .checkin__geofence {
   margin: 12px 0; font-size: 13px; padding: 8px 12px;
   border-radius: var(--r-full); display: inline-block;

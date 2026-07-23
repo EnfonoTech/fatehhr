@@ -59,6 +59,25 @@ def month(year: int, month: int) -> dict:
 	)
 	att_by_day = {a.attendance_date.isoformat(): a for a in attendance_rows}
 
+	# Cooperheat attendance is derived into the `custom_site_hours` child of
+	# Attendance (project + in/out + hours) and often has NO raw Employee Checkin
+	# behind it (imported / device-punch aggregated server-side). Bulk-fetch those
+	# per-site rows so a day with no raw check-ins still shows its real hours+site.
+	site_hours_by_day: dict[str, list] = {}
+	att_names = [a.name for a in attendance_rows]
+	if att_names and frappe.get_meta("Attendance").has_field("custom_site_hours"):
+		sh_rows = frappe.get_all(
+			"Attendance Site Hours",
+			filters={"parent": ["in", att_names], "parenttype": "Attendance"},
+			fields=["parent", "project", "project_name", "check_in_time", "check_out_time", "hours"],
+			order_by="check_in_time asc",
+		)
+		name_to_day = {a.name: a.attendance_date.isoformat() for a in attendance_rows}
+		for sr in sh_rows:
+			day_key = name_to_day.get(sr.parent)
+			if day_key:
+				site_hours_by_day.setdefault(day_key, []).append(sr)
+
 	leave_rows = frappe.get_all(
 		"Leave Application",
 		filters={
@@ -80,6 +99,11 @@ def month(year: int, month: int) -> dict:
 		pairs = _build_pairs(day_rows, d)
 		hours = round(sum((p["hours"] for p in pairs)), 2)
 		arow = att_by_day.get(key)
+		# No raw check-ins but the Attendance has derived site-hours → surface those
+		# so the employee sees their real per-site pairs + hours (cooperheat path).
+		if not pairs and site_hours_by_day.get(key):
+			pairs = _pairs_from_site_hours(site_hours_by_day[key])
+			hours = round(arow.get("working_hours") or sum(p["hours"] for p in pairs), 2) if arow else round(sum(p["hours"] for p in pairs), 2)
 		status = _derive_status(d, arow, pairs, leave_rows, holidays)
 		days.append({
 			"date": key,
@@ -120,6 +144,24 @@ def _build_pairs(rows, for_date):
 				current_in = None
 	if current_in:
 		pairs.append(_autoclose(current_in, for_date))
+	return pairs
+
+
+def _pairs_from_site_hours(rows):
+	"""Build display pairs from Attendance `custom_site_hours` (cooperheat-derived,
+	one row per site with its own in/out + hours). Read-only — there are no raw
+	Employee Checkins behind these."""
+	pairs = []
+	for r in rows:
+		ci, co = r.get("check_in_time"), r.get("check_out_time")
+		pairs.append({
+			"in": _naive_site_to_utc_iso(ci) if ci else None,
+			"out": _naive_site_to_utc_iso(co) if co else None,
+			"task": None,
+			"location": r.get("project_name") or r.get("project"),
+			"project": r.get("project_name") or r.get("project"),
+			"hours": round(max((r.get("hours") or 0), 0), 2),
+		})
 	return pairs
 
 

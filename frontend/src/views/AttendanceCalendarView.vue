@@ -71,7 +71,7 @@ function tap(d: string) {
   selectedDate.value = d;
 }
 
-function fmtHM(iso: string): string {
+function fmtHM(iso: string | null): string {
   if (!iso) return "";
   // Server now ships UTC-ISO ("…Z"); fall back to naive parse for legacy.
   const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T"));
@@ -135,7 +135,7 @@ const selected = computed(() =>
         <ul class="cal__pairs" v-if="selected.pairs.length">
           <li v-for="(p, i) in selected.pairs" :key="i">
             {{ fmtHM(p.in) }} → {{ fmtHM(p.out) }}
-            · {{ p.task ?? t("attendance.no_task") }}
+            · {{ p.project || p.task || t("attendance.no_task") }}
             <em v-if="p.open_pair_autoclosed">({{ t("attendance.autoclosed") }})</em>
           </li>
         </ul>

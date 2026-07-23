@@ -8,10 +8,12 @@ export interface DayRec {
   workflow_state?: string | null;
   current_approver_name?: string | null;
   pairs: {
-    in: string;
-    out: string;
+    in: string | null;
+    out: string | null;
     task: string | null;
     location: string | null;
+    /** Cooperheat: site name when the pair is derived from Attendance site-hours. */
+    project?: string | null;
     hours: number;
     open_pair_autoclosed?: boolean;
   }[];

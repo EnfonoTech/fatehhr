@@ -269,10 +269,16 @@ def open_checkin() -> dict:
 		return {}
 	from frappe.utils import today
 	has_proj = _checkin_has("custom_project")
+	has_selfie = _checkin_has("custom_selfie")
+	fields = ["name", "log_type", "time"]
+	if has_proj:
+		fields.append("custom_project")
+	if has_selfie:
+		fields.append("custom_selfie")
 	rows = frappe.get_all(
 		"Employee Checkin",
 		filters={"employee": employee, "time": ["between", [today() + " 00:00:00", today() + " 23:59:59"]]},
-		fields=["name", "log_type", "time"] + (["custom_project"] if has_proj else []),
+		fields=fields,
 		order_by="time asc",
 	)
 	open_in = None
@@ -289,6 +295,8 @@ def open_checkin() -> dict:
 		"time": _naive_site_to_utc_iso(open_in.time),
 		"custom_project": proj,
 		"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+		# Check-in selfie so the check-OUT screen can show what was captured at IN.
+		"custom_selfie": open_in.get("custom_selfie") if has_selfie else None,
 	}
 
 
