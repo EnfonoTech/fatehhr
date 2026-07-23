@@ -45,6 +45,10 @@ async function submit() {
   error.value = null;
   try {
     const trimmed = email.value.trim();
+    // Drop any stale credentials from a previous session BEFORE authenticating.
+    // A leftover api_key/secret (e.g. rotated by a server-side password change)
+    // would otherwise be attached to requests and 401 as a bogus "wrong password".
+    await session.clear();
     // PIN recovery: clear the server-side PIN first (password-gated), so the
     // login below comes back with require_pin_setup → "Set a PIN".
     if (resetPin.value) {

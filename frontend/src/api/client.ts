@@ -17,6 +17,7 @@ export async function apiCall<T = unknown>(
   method: "GET" | "POST",
   endpoint: string,
   body?: unknown,
+  opts?: { noAuth?: boolean },
 ): Promise<T> {
   const session = useSessionStore();
   const base = API_BASE();
@@ -25,7 +26,11 @@ export async function apiCall<T = unknown>(
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (session.apiKey && session.apiSecret) {
+  // Guest auth endpoints (login/verify_pin/forgot_pin) must NOT carry a token.
+  // A stale api_key/secret left in storage (e.g. after a server-side password
+  // change rotated the secret) would make Frappe reject the whole request at
+  // validate_auth() with 401 — surfacing as a bogus "wrong password". Skip it.
+  if (!opts?.noAuth && session.apiKey && session.apiSecret) {
     headers["Authorization"] = `token ${session.apiKey}:${session.apiSecret}`;
   }
 
@@ -44,10 +49,12 @@ export async function apiCall<T = unknown>(
     /* ignore non-JSON */
   }
 
-  if (resp.status === 401 && !(body && (body as Record<string, unknown>).__retry)) {
-    // One silent retry after re-hydrating session (frappe-vue-pwa §7).
+  if (resp.status === 401 && !opts?.noAuth && !(body && (body as Record<string, unknown>).__retry)) {
+    // One silent retry after re-hydrating session (frappe-vue-pwa §7). Skipped
+    // for noAuth calls — there is no token to re-hydrate, and a 401 there is a
+    // genuine credential failure that must propagate.
     await session.hydrate();
-    return apiCall<T>(method, endpoint, { ...((body as Record<string, unknown>) ?? {}), __retry: true });
+    return apiCall<T>(method, endpoint, { ...((body as Record<string, unknown>) ?? {}), __retry: true }, opts);
   }
 
   if (!resp.ok) {

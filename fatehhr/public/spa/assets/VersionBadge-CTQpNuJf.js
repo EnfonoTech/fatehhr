@@ -1,1 +1,0 @@
-import{d as o,b as t,c as r,t as e,f as s,ac as n}from"./index-BouFzsqR.js";import{_ as c}from"./_plugin-vue_export-helper-DlAUqK2U.js";const _={class:"ver","aria-label":"Build version"},i=o({__name:"VersionBadge",setup(p){const a="260722-2233";return(d,l)=>(t(),r("p",_,"v"+e(s(n))+" · "+e(s(a)),1))}}),u=c(i,[["__scopeId","data-v-0f1e33e6"]]);export{u as V};
