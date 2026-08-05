@@ -53,16 +53,28 @@ frappe-bench/apps/fatehhr/
 
 | Thing                  | Value                                                               |
 |------------------------|---------------------------------------------------------------------|
-| Latest APK             | `fatehhr-demo-1.0.22.apk` (versionCode **23**)                      |
+| Latest APK             | `fatehhr-demo-1.0.39-debug.apk` (versionCode **40**)                |
+| APK download           | https://hr-demo.enfonoerp.com/files/fatehhr-demo-1.0.39-debug.apk   |
 | PWA URL                | https://hr-demo.enfonoerp.com/fatehhr                               |
-| APK download           | https://github.com/EnfonoTech/fatehhr/releases/tag/frontend-dev    |
-| PWA tarball asset      | `fatehhr-dist.tar.gz` on the same release                           |
 | GitHub repo            | `EnfonoTech/fatehhr` (branch: **develop**)                          |
 | Customer env           | `customers/.env.demo`                                               |
 | Android app id         | `com.enfono.fatehhr.demo`                                           |
+| Server address         | **runtime, not build-time** — see §4.5. `CUSTOMER_ERP_DOMAIN` is now only a default |
 | Keystore               | `android-capacitor/keystore/fatehhr-release.keystore`               |
 | Keystore password file | `~/.fatehhr-keystore-pw` (contains `FATEHHR_KEYSTORE_PW` + `FATEHHR_KEY_PW`) |
 | Capacitor plugins      | app, camera, filesystem, geolocation, haptics, network, preferences |
+
+> **The hosted APK is DEBUG-signed** (release needs the keystore passwords, which are
+> not in CI). Debug and release use different certs — never mix the two lineages on
+> one device, Android will force an uninstall. The debug cert has been stable since
+> 1.0.35, so debug→debug upgrades install in place and keep queued offline work.
+
+> **ONE SLUG PER SITE.** `customers/.env.<slug>` → exactly one `CUSTOMER_ERP_DOMAIN`,
+> and no two slugs may name the same host. This was violated once (`demo` and
+> `cooperheat-demo` both claimed `hr-demo.enfonoerp.com`) and it silently shipped the
+> wrong brand *and* flipped `CUSTOMER_APPROVALS_ENABLED`. **hr-demo is the Fateh HR
+> demo.** Before building for a domain, confirm ownership by reading the live title:
+> `curl -s https://<host>/assets/fatehhr/spa/index.html | grep -o '<title>[^<]*</title>'`
 
 ---
 
@@ -86,14 +98,28 @@ The control server exposes an HTTP API that lets agents run commands and upload 
 
 | Field    | Value                                                    |
 |----------|----------------------------------------------------------|
-| Control  | `207.180.209.80:3847` (or `http://<ip>:3847`)            |
-| Token    | `Bearer 9c9d7e54d54c30e9f264f202376c04ed4dd4bab9c57eb2b3` |
+| Control  | **`194.163.160.83:3847`**                                |
+| Token    | never hardcoded — fetch it live (below)                   |
 | Endpoint | `POST /api/servers/<SERVER_ID>/command`                  |
 | Body     | `{"command": "<bash string>"}`                           |
 | Returns  | `{stdout, stderr, code, success}`                        |
 
-If the token is rotated, fetch the current one:
-`ssh root@207.180.209.80 "grep AGENT_SECRET /opt/server-manager-agent/.env"`
+> **⚠️ The old control server `207.180.209.80` is DECOMMISSIONED** (malware incident;
+> it is now managed node EFTSP-015). An auth failure or "REMOTE HOST IDENTIFICATION
+> CHANGED" for that IP means you are on the wrong box.
+
+Fetch the token — never paste it into a doc or commit:
+
+```bash
+ssh root@194.163.160.83 "grep AGENT_SECRET /opt/server-manager-agent/.env"
+```
+
+**The API has repeatedly returned an empty body / HTTP 000 with a valid token.** The
+reliable path is the SSH jump, which is what every deploy in this repo actually used:
+
+```bash
+ssh root@194.163.160.83 "ssh -i /root/.ssh/id_ed25519 root@185.193.19.184 '<command>'"
+```
 
 **Full skill docs:** `~/.claude/skills/enfono-servers/SKILL.md`.
 
@@ -123,57 +149,141 @@ The deploy has **two independent tracks** — you almost always need both.
 
 ### 4.1 Web PWA (fast; every change)
 
+**`fatehhr/public/spa/` is TRACKED IN GIT** (~103 files). The old tarball-via-GitHub-
+release flow is obsolete — the bundle ships with the commit and the server just pulls.
+
 ```bash
-# 1. Local: build
-cd frontend && CUSTOMER_BUILD_TARGET=web pnpm exec vite build
+# 1. Local: build + stage into fatehhr/public/spa/
+bash scripts/deploy-pwa.sh demo          # slug must own the target domain — see §2
 
-# 2. Tar + upload the dist/
-cd dist && tar czf /tmp/fatehhr-dist.tar.gz --exclude='.DS_Store' .
-gh release upload frontend-dev /tmp/fatehhr-dist.tar.gz --clobber
+# 2. Commit the bundle and push
+git add -A fatehhr/public/spa/ && git commit -m "deploy: PWA build for demo"
+git push origin develop
 
-# 3. Server: git pull → download tarball → extract into public/spa → signal workers
-# (one curl to server-manager with this command string:)
-set -e
-cd /home/v15/frappe-bench/apps/fatehhr && sudo -u v15 git pull --ff-only
-cd /tmp && curl -fsSL -o fatehhr-dist.tar.gz \
-  https://github.com/EnfonoTech/fatehhr/releases/download/frontend-dev/fatehhr-dist.tar.gz
-sudo -u v15 rm -rf /home/v15/frappe-bench/apps/fatehhr/fatehhr/public/spa
-sudo -u v15 mkdir -p /home/v15/frappe-bench/apps/fatehhr/fatehhr/public/spa
-sudo -u v15 tar xzf /tmp/fatehhr-dist.tar.gz \
-  -C /home/v15/frappe-bench/apps/fatehhr/fatehhr/public/spa
-sudo supervisorctl signal QUIT frappe-bench-web:frappe-bench-frappe-web
-sudo supervisorctl signal QUIT frappe-bench-workers:frappe-bench-frappe-long-worker-0
-sudo supervisorctl signal QUIT frappe-bench-workers:frappe-bench-frappe-short-worker-0
+# 3. Server: pull + reload web
+ssh root@194.163.160.83 "ssh -i /root/.ssh/id_ed25519 root@185.193.19.184 '
+  su - v15 -c \"cd /home/v15/frappe-bench/apps/fatehhr \
+    && git fetch upstream develop -q && git reset --hard upstream/develop -q \
+    && git clean -fdq fatehhr/public/spa\"
+  sudo supervisorctl signal QUIT frappe-bench-web:frappe-bench-frappe-web'"
 ```
 
-The `public/spa/` folder symlinks into `sites/assets/fatehhr/spa/`, which Frappe
-serves at `/assets/fatehhr/spa/`. The `website_redirects` in `hooks.py` maps
-`/fatehhr` → `/assets/fatehhr/spa/index.html`.
+- The git remote on the server checkout is named **`upstream`**, not `origin`.
+- `git clean -fdq fatehhr/public/spa` clears stale content-hashed chunks left behind
+  by the previous build; without it they accumulate forever.
+- **`bench build` is NOT needed** — `sites/assets/fatehhr` is a symlink to
+  `apps/fatehhr/fatehhr/public`, so a new bundle is served the moment it lands.
+- `website_redirects` in `hooks.py` maps `/fatehhr` → `/assets/fatehhr/spa/index.html`.
+- **Expect uncommitted local edits on the server checkout.** Back up and prove they
+  carry no unique work *before* `reset --hard` — see §7 "Server checkout drift".
 
 ### 4.2 Android APK (one script, then upload)
 
-```bash
-# Preconditions:
-#  • Keystore at android-capacitor/keystore/fatehhr-release.keystore (DO NOT COMMIT)
-#  • Passwords exported OR sourced from ~/.fatehhr-keystore-pw
-export FATEHHR_KEYSTORE_PW=... FATEHHR_KEY_PW=...
+**Toolchain — NOTHING is on PATH by default.** `java -version` fails outright on this
+Mac. Export these first or gradle will not run:
 
-cd /Users/sayanthns/Documents/fatehhr
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17     # JDK 17, NOT 21 — AGP 8.2.1 + gradle 8.2.1 + compileSdk 34
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # build-tools 34.0.0 + 35.0.0, platforms android-34 + 36
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/build-tools/34.0.0:$PATH"   # gives you aapt + apksigner
+```
+
+**Signed release** (needs the keystore passwords):
+
+```bash
+export FATEHHR_KEYSTORE_PW=... FATEHHR_KEY_PW=...
 bash scripts/build-customer.sh demo
-#   → bumps NATIVE_VERSION (patch)
+#   → bumps NATIVE_VERSION + versionCode
 #   → builds web with CUSTOMER_BUILD_TARGET=native
 #   → generates customer assets (icons/colors)
-#   → npx cap copy android (IMPORTANT: run cap sync once per new plugin)
+#   → npx cap copy android (run cap sync once per NEW plugin)
 #   → gradlew assembleRelease
 #   → writes dist/fatehhr-demo-X.Y.Z.apk
-
-gh release upload frontend-dev dist/fatehhr-demo-X.Y.Z.apk --clobber
-git add frontend/src/app/native-version.ts && git commit -m "chore: bump ..."
-git push origin develop
 ```
+
+**Debug build** (no passwords needed — this is what 1.0.35–1.0.39 shipped as). Same
+steps minus the signing; `build-customer.sh` only does release, so run them manually:
+
+```bash
+set -a && source customers/.env.demo && set +a
+node scripts/bump-version.mjs patch
+NV=$(grep -oE 'NATIVE_VERSION\s*=\s*"[^"]+"' frontend/src/app/native-version.ts | cut -d'"' -f2)
+NVC=$(grep -oE 'NATIVE_VERSION_CODE\s*=\s*[0-9]+' frontend/src/app/native-version.ts | grep -oE '[0-9]+')
+(cd frontend && CUSTOMER_BUILD_TARGET=native CUSTOMER_ERP_DOMAIN="$CUSTOMER_ERP_DOMAIN" \
+  CUSTOMER_BRAND_NAME="$CUSTOMER_BRAND_NAME" CUSTOMER_PRIMARY_COLOR="$CUSTOMER_PRIMARY_COLOR" \
+  CUSTOMER_LOCALE="$CUSTOMER_LOCALE" CUSTOMER_SELFIE_MODE="$CUSTOMER_SELFIE_MODE" \
+  CUSTOMER_APPROVALS_ENABLED="$CUSTOMER_APPROVALS_ENABLED" pnpm build)
+CUSTOMER_SLUG="$CUSTOMER_SLUG" CUSTOMER_PRIMARY_COLOR="$CUSTOMER_PRIMARY_COLOR" \
+  node scripts/generate-customer-assets.mjs
+(cd android-capacitor && npx cap copy android)
+(cd android-capacitor/android && APP_ID_ANDROID="$APP_ID_ANDROID" \
+  CUSTOMER_BRAND_NAME="$CUSTOMER_BRAND_NAME" CUSTOMER_PRIMARY_COLOR="$CUSTOMER_PRIMARY_COLOR" \
+  NATIVE_VERSION="$NV" NATIVE_VERSION_CODE="$NVC" ./gradlew assembleDebug --no-daemon)
+cp android-capacitor/android/app/build/outputs/apk/debug/app-debug.apk \
+   "dist/fatehhr-demo-$NV-debug.apk"
+```
+
+`app/build.gradle` reads **all five** of `APP_ID_ANDROID`, `CUSTOMER_BRAND_NAME`,
+`CUSTOMER_PRIMARY_COLOR`, `NATIVE_VERSION`, `NATIVE_VERSION_CODE` from the environment
+(patched in by `scripts/_patch-build-gradle.py`). Omit them and you silently get
+`com.enfono.fatehhr` / version `1.0` / brand "Fateh HR" — a build that looks fine and
+is wrong.
+
+**Verify before shipping** — never trust the build log:
+
+```bash
+aapt dump badging dist/fatehhr-demo-$NV-debug.apk | grep -E '^package|^application-label:'
+apksigner verify --print-certs dist/fatehhr-demo-$NV-debug.apk | grep 'SHA-256'
+# icon: extract it back OUT of the APK and mask it (see §7 Capacitor/Android)
+```
+
+**Hosting** — served as a site public file, replacing the previous one:
+
+```bash
+# local → control → AQRAR, md5-verified at each hop
+scp dist/fatehhr-demo-$NV-debug.apk root@194.163.160.83:/tmp/
+# then control → 185.193.19.184:/home/v15/frappe-bench/sites/hr_demo/public/files/
+# chown v15:v15, chmod 644, and rm the previous version
+```
+→ `https://hr-demo.enfonoerp.com/files/fatehhr-demo-<ver>-debug.apk`
+
+**⚠️ That URL is publicly downloadable by anyone who has it.** Delete the file when
+testing is done.
 
 **Commandment #15**: `NATIVE_VERSION` and `versionCode` must bump together every build.
 `bump-version.mjs` handles both. Never edit them by hand.
+
+### 4.5 Runtime server switching (1.0.37+)
+
+The server address is **no longer baked in**. One APK can point at any Fateh HR site.
+
+| Piece | Where |
+|---|---|
+| storage + normalise + `API_BASE()` | `frontend/src/app/platform.ts` |
+| first-run screen | `frontend/src/views/SiteSetupView.vue` (route `/setup`) |
+| reachability probe | `frontend/src/api/site-probe.ts` → `fatehhr.api.auth.site_info` |
+| router guard | `frontend/src/app/router.ts` |
+| Change server | `frontend/src/views/MoreView.vue` |
+| resume-time config refetch | `frontend/src/app/config-refresh.ts` |
+
+- `CUSTOMER_ERP_DOMAIN` is now an **optional default**. Set → APK is pre-pointed and
+  skips `/setup`. Leave empty → the installer picks the server on first launch.
+- The stored URL lives in **localStorage AND Preferences**, and the module cache is
+  seeded *synchronously at import*. **Never gate a pre-mount storage read on
+  `isNative()`** — `loadSiteUrl()` runs before `app.mount()` and the Capacitor bridge
+  may not have injected `window.Capacitor` yet. That bug made a configured APK re-ask
+  for its server every launch.
+- **A site without `site_info` answers HTTP 417, not 404** (measured on hr-demo). The
+  probe therefore falls through to `frappe.ping` on *any* non-OK status, so a new APK
+  can still be pointed at a site that has not been updated yet.
+- Change server is **blocked while the offline queue is non-empty** — queued check-ins
+  reference Employee/site names that do not exist on another tenant.
+- Two-tap confirm, not `window.confirm` — **the Android WebView silently drops
+  `confirm`/`prompt`** (see `SyncErrorsView.vue`).
+- Every target site needs the Capacitor CORS origins in `site_config.json`
+  (`after_migrate` → `ensure_capacitor_cors`). A CORS block is indistinguishable from a
+  typo in `fetch` (both `TypeError`), which is why the "couldn't reach" copy names app
+  access explicitly.
 
 ### 4.3 Adding a new Capacitor plugin
 
@@ -240,16 +350,29 @@ import frappe
 frappe.db.commit()
 PYEOF
 
-# 2. Base64-upload to the server
-SCRIPT_B64=$(base64 < /tmp/my_script.py | tr -d '\n')
-PAYLOAD=$(python3 -c "import json; print(json.dumps({'command': f'echo \"$SCRIPT_B64\" | base64 -d | sudo -u v15 tee /tmp/my_script.py >/dev/null'}))")
-curl -s -X POST "http://207.180.209.80:3847/api/servers/3beb2d91-86d1-4d2d-ba0b-30955992455c/command" \
-  -H "Authorization: Bearer 9c9d7e54d54c30e9f264f202376c04ed4dd4bab9c57eb2b3" \
-  -H "Content-Type: application/json" -d "$PAYLOAD"
-
-# 3. Run it through a shell wrapper (kept at /tmp/run_py.sh)
-#   The wrapper inits frappe then exec()s your script. See /tmp/run_py.sh
+# 2. Ship it and run it — SSH jump, which is the path that actually works
+scp /tmp/my_script.py root@194.163.160.83:/tmp/
+ssh root@194.163.160.83 "scp -i /root/.ssh/id_ed25519 /tmp/my_script.py root@185.193.19.184:/home/v15/"
+ssh root@194.163.160.83 "ssh -i /root/.ssh/id_ed25519 root@185.193.19.184 '
+  chown v15:v15 /home/v15/my_script.py
+  su - v15 -c \"cd /home/v15/frappe-bench/sites && ../env/bin/python /home/v15/my_script.py\"'"
 ```
+
+Three traps here, all paid for:
+
+- **cwd must be `frappe-bench/sites`**, not the bench root. From the root, `frappe.init()`
+  resolves `sites_path` wrong (`IncorrectSitePath`) and the logger writes to a
+  non-existent dir.
+- **Put the script under `/home/v15/`, not `/tmp`** — re-writing a root-owned `/tmp`
+  file as `v15` hits `Permission denied`.
+- **`bench --site X console < script.py` swallows print output** (IPython echoes prompts
+  instead). Use `env/bin/python` with `frappe.init()` + `frappe.connect()` as above.
+- **`bench execute --kwargs` is `eval`'d as PYTHON, not JSON** — `{"force": true}` dies
+  with `NameError: name 'true' is not defined`. Use `True` / `False` / `None`.
+
+If you use the Server Manager API instead, fetch the token live
+(`ssh root@194.163.160.83 "grep AGENT_SECRET /opt/server-manager-agent/.env"`) — never
+paste it into a file.
 
 Once-only setup for the runner shell script (`/tmp/run_py.sh`):
 ```bash
@@ -348,8 +471,64 @@ Then just `sed` the path in run_py.sh to point at each new script.
 17. **Duplicate Android resources**: custom colour overrides (like `ic_launcher_background`)
     must **overwrite** Capacitor's default file, not append.
 
-18. **Stale compiled `.vue.js` / `.d.ts`** from TypeScript watch can override the live `.ts`
-    source during Vite build. If you see "X is not exported by Y.js", `rm` those artifacts.
+18. **Stale compiled `.vue.js` / `.d.ts`** — **root-caused and fixed in 1.0.37.**
+    `tsconfig.json` had no `noEmit`, so tsc wrote a `.js` beside every `.ts` in `src/`,
+    and Vite's default `resolve.extensions` puts `.js` **before** `.ts` — so an
+    extensionless `@/app/platform` import resolved to the stale emit. `pnpm build`
+    (`vue-tsc -b && vite build`) re-emitted first and so masked itself, but `pnpm dev`
+    and `vitest` silently ran older code. Now `"noEmit": true`. The two committed
+    `frontend/plugins/*.js` duplicates were deleted for the same reason and the pattern
+    is gitignored. **If you ever see a `.js` next to a `.ts` in this repo, something
+    regressed.**
+
+19. **Verify an icon change by extracting it back OUT of the APK** — the generator log
+    is not evidence:
+    ```bash
+    unzip -o apk 'res/mipmap-xxxhdpi*/*' -d /tmp/apkres
+    # composite ic_launcher_background.png + ic_launcher_foreground.png,
+    # then apply a circle AND a squircle mask
+    ```
+    An **unmasked adaptive icon legitimately looks like a tile inset in the accent
+    colour** — that is correct, not a defect. Launchers mask down to roughly the central
+    66%. Both `logo.default.png` and `logo.cooperheat.png` measure exactly 66.0% linear
+    / 43.6% area opaque, centred, which is what appicon.co emits as
+    `adaptive-foreground`. Mistaking that inset for an artifact cost a cycle once.
+
+20. **Icon fallback chain** is `customers/logo.<slug>.png` → `customers/logo.default.png`
+    (the Fateh HR mark) → generated khatam glyph. A slug with no logo file inherits the
+    Fateh HR icon — which is how a Cooperheat-branded build once shipped with a Fateh HR
+    icon. Give every customer slug its own `logo.<slug>.png`, and pair it with a matching
+    `CUSTOMER_PRIMARY_COLOR` or the accent shows as a ring around the tile.
+
+21. **`capacitor.config.json` inside the APK is NOT proof of which customer a build is
+    for.** It reads `appId: com.enfono.fatehhr` / `appName: Fateh HR` because `npx cap
+    copy` runs without the customer env exported. Package identity comes from gradle's
+    `applicationId` — check `aapt dump badging`.
+
+22. **A different `applicationId` is a different Android app.** Changing slug (e.g.
+    `com.enfono.fatehhr.cooperheatdemo` → `com.enfono.fatehhr.demo`) does **not** upgrade
+    in place; testers end up with two apps side by side unless they uninstall first.
+
+### Server checkout drift
+
+23. **`apps/fatehhr` on AQRAR routinely has uncommitted local edits.** Seen twice: 160
+    insertions across 5 tracked files plus an untracked 403-line `approvals.py`. Both
+    times it was strictly *older* than git, but **prove that before discarding**:
+    ```bash
+    # back up first — tarball + tracked-diff patch + untracked inventory + old SPA
+    tar czf /root/fatehhr-app-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz -C apps fatehhr
+    git diff > /root/fatehhr-local-tracked-<ts>.patch
+    # then: md5 each modified file against your target commit, and diff the rest.
+    # "N removed / 0 added" == server merely lags. Any unique insertion == STOP.
+    ```
+    Backups from 2026-08-05 are on the box at `/root/fatehhr-*20260805T005200Z*`.
+
+24. **`deploy-pwa.sh` used to drop `CUSTOMER_APPROVALS_ENABLED`**, so every web build got
+    the plugin default (`false`) regardless of the customer env file — silently hiding the
+    approvals UI. Fixed. General rule: when a themed flag matters, grep the built index
+    chunk for the inlined boolean (`iE=!0` vs `iE=!1`) next to the brand string.
+    **Chunk-hash changes are not proof** — a dependent chunk rehashes purely because its
+    import filenames changed.
 
 ---
 
