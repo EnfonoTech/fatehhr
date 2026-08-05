@@ -1,4 +1,4 @@
 // Bumped by scripts/bump-version.mjs on every release build.
 // Rule (frappe-vue-pwa §5 #15): versionCode AND NATIVE_VERSION increment together.
-export const NATIVE_VERSION = "1.0.37";
-export const NATIVE_VERSION_CODE = 38;
+export const NATIVE_VERSION = "1.0.38";
+export const NATIVE_VERSION_CODE = 39;
