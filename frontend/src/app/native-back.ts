@@ -52,6 +52,16 @@ const PARENT_BY_ROUTE_NAME: Record<string, string> = {
   "sync.errors": "/more",
 };
 
+/**
+ * Pre-auth screens have nowhere to go "up" to. Without this they fell through to
+ * "/" and the router guard immediately bounced them straight back — Back looked
+ * dead. Treat them like home: double-tap exits.
+ *
+ * `setup` reached with `?change=1` is the exception; that one came from More, so
+ * it returns there (handled below).
+ */
+const EXIT_ROUTES = new Set(["setup", "login", "pin"]);
+
 function showExitHint(message: string) {
   const existing = document.getElementById(TOAST_KEY);
   if (existing) existing.remove();
@@ -88,7 +98,16 @@ export async function installNativeBackHandler(router: Router): Promise<void> {
   App.addListener("backButton", async () => {
     const current = router.currentRoute.value;
     const routeName = typeof current.name === "string" ? current.name : "";
-    const isHome = current.path === "/" || routeName === "dashboard";
+
+    // A deliberate server change was launched from More — go back there rather
+    // than exiting, and leave the session untouched (nothing is committed until
+    // the new address is verified).
+    if (routeName === "setup" && current.query.change === "1") {
+      router.replace("/more");
+      return;
+    }
+
+    const isHome = current.path === "/" || routeName === "dashboard" || EXIT_ROUTES.has(routeName);
 
     if (!isHome) {
       const parent = PARENT_BY_ROUTE_NAME[routeName] ?? "/";

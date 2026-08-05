@@ -13,6 +13,21 @@
     "hide_password": "Hide password",
     "reset_pin_hint": "Re-enter your password to reset your PIN. You'll set a new one next."
   },
+  "setup": {
+    "title": "Server",
+    "intro": "Enter the server address your HR team gave you. You'll only need to do this once.",
+    "change_hint": "Enter the new server address. You'll be signed out and will need to log in again.",
+    "address": "Server address",
+    "placeholder": "hr.company.com",
+    "continue": "Continue",
+    "checking": "Checking…",
+    "err_empty": "Enter your server address.",
+    "err_invalid": "That doesn't look like a valid address.",
+    "err_incomplete": "Enter the full address, e.g. hr.company.com",
+    "err_timeout": "That address didn't respond. Check the spelling and your connection, then try again.",
+    "err_unreachable": "Couldn't reach that address. Check the spelling and your connection — and ask IT whether the server allows app access.",
+    "err_not_app": "Reached that address, but it isn't a Fateh HR server. Check it with your HR team."
+  },
   "pin": {
     "title": "Enter PIN",
     "setup_title": "Set a PIN",
@@ -232,7 +247,13 @@
     "bio_turn_off": "Turn off biometric unlock",
     "bio_enabled": "{label} unlock enabled.",
     "bio_disabled": "Biometric unlock disabled.",
-    "bio_cancelled": "Biometric setup cancelled."
+    "bio_cancelled": "Biometric setup cancelled.",
+    "server": "Server",
+    "current_server": "Connected to {host}",
+    "change_server": "Change server",
+    "change_server_arm": "Tap again to confirm",
+    "change_server_hint": "You'll be signed out and will need to log in again.",
+    "change_server_blocked": "{n} changes are still waiting to sync. Sync them first — they belong to this server and can't move to another one."
   },
   "expense": {
     "title": "Expense Claim",

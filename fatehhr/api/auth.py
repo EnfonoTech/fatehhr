@@ -13,6 +13,26 @@ class PinLockoutError(frappe.AuthenticationError):
 	http_status_code = 423  # Locked
 
 
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def site_info() -> dict:
+	"""Pre-login reachability probe for the app's server-address screen.
+
+	allow_guest justification: the app must confirm a user-typed URL before
+	anyone can log in — there is no session yet, so no authenticated call can do
+	this job. A stored typo is unrecoverable from inside the app (every later
+	screen fails with a bare network error and the login screen has no address
+	field), so the probe is the only thing standing between a fat-fingered
+	hostname and a phone that has to be reinstalled.
+
+	Returns no site, tenant, user or configuration data — only enough to answer
+	"is this a Fateh HR server?". That leaks strictly less than the login page,
+	which already reveals the app's existence to anyone who loads it.
+	"""
+	from fatehhr import __version__
+
+	return {"ok": True, "app": "fatehhr", "app_version": __version__}
+
+
 @frappe.whitelist(allow_guest=True)
 def login(usr: str, pwd: str) -> dict:
 	"""Email+password first-time login.

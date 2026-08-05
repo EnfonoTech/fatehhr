@@ -5,3 +5,6 @@ frontend/src/**/*.js
 frontend/src/**/*.d.ts
 !frontend/src/vite-env.d.ts
 dist/
+
+# tsc no longer emits (tsconfig noEmit); these were compiled duplicates of the .ts
+frontend/plugins/*.js

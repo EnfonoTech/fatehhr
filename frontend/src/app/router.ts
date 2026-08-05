@@ -1,7 +1,13 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
 import { useSessionStore } from "@/stores/session";
+import { needsSiteSetup } from "@/app/platform";
 
 const routes: RouteRecordRaw[] = [
+  // Top-level, i.e. NOT a child of "/" — that is what keeps the chrome off.
+  // This app has no chromeless-route list: TopAppBar / BottomNav are imported
+  // per view, and the "/" parent is the only thing that implies a tab bar.
+  // Sibling of login/pin, same as them.
+  { path: "/setup", name: "setup", component: () => import("@/views/SiteSetupView.vue") },
   { path: "/login", name: "login", component: () => import("@/views/LoginView.vue") },
   { path: "/pin", name: "pin", component: () => import("@/views/PinView.vue") },
   {
@@ -63,13 +69,33 @@ export function createAppRouter() {
   // trigger a fresh self-heal.
   router.afterEach(() => sessionStorage.removeItem(RELOAD_KEY));
 
+  // Routes reachable before a server + session exist.
+  const PRE_AUTH = new Set(["setup", "login", "pin"]);
+
   router.beforeEach(async (to) => {
+    // Server first. Without a site URL every later check can only produce a bare
+    // network error, so this has to run ahead of the auth guards.
+    if (needsSiteSetup() && to.name !== "setup") {
+      return { name: "setup", replace: true };
+    }
+
     const session = useSessionStore();
     await session.hydrate();
-    if (!session.hasApiSecret && to.name !== "login" && to.name !== "pin") {
+
+    // Configured → never sit on setup, so a cold start can't land here
+    // (commandment 21). `?change=1` is the deliberate re-point from
+    // More → Change server and is allowed through.
+    //
+    // NOT gated on being signed in: doing that strands a configured-but-signed-out
+    // app on the setup screen with no way forward.
+    if (to.name === "setup" && !needsSiteSetup() && to.query.change !== "1") {
+      return { name: session.hasApiSecret ? "dashboard" : "login", replace: true };
+    }
+
+    if (!session.hasApiSecret && !PRE_AUTH.has(String(to.name))) {
       return { name: "login" };
     }
-    if (session.hasApiSecret && !session.isPinVerified && to.name !== "pin" && to.name !== "login") {
+    if (session.hasApiSecret && !session.isPinVerified && !PRE_AUTH.has(String(to.name))) {
       return { name: "pin" };
     }
     return true;

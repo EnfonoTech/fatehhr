@@ -10,7 +10,9 @@ import VersionBadge from "@/components/VersionBadge.vue";
 import Icon from "@/components/Icon.vue";
 import { useProfileStore } from "@/stores/profile";
 import { useSessionStore } from "@/stores/session";
+import { useSyncStore } from "@/stores/sync";
 import { setLocale } from "@/app/i18n";
+import { isNative, siteUrl } from "@/app/platform";
 import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 import {
   getBiometricInfo,
@@ -23,6 +25,55 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const profile = useProfileStore();
 const session = useSessionStore();
+const sync = useSyncStore();
+
+// Only native builds can be re-pointed. A web build is served BY its Frappe host,
+// so "change server" there would mean navigating away from the app itself.
+const showServerCard = isNative();
+const serverHost = computed(() => {
+  const url = siteUrl();
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+});
+const serverArmed = ref(false);
+const serverMessage = ref<string | null>(null);
+
+/**
+ * Two-tap confirm, not `window.confirm` — the Android WebView silently drops it
+ * (see SyncErrorsView). A dialog that always returns falsy would make this button
+ * look broken on exactly the platform it exists for.
+ */
+async function changeServer() {
+  serverMessage.value = null;
+
+  // Re-count from IndexedDB rather than trusting the store: queued documents
+  // belong to the site that created them. Draining them into another tenant
+  // posts real records against the wrong Employees, and site / project names do
+  // not translate across servers (commandment 23).
+  await sync.refresh();
+  if (sync.pending > 0) {
+    serverArmed.value = false;
+    serverMessage.value = t("more.change_server_blocked", { n: sync.pending });
+    return;
+  }
+
+  if (!serverArmed.value) {
+    serverArmed.value = true;
+    window.setTimeout(() => {
+      serverArmed.value = false;
+    }, 4000);
+    return;
+  }
+
+  serverArmed.value = false;
+  // Nothing is torn down yet — the setup screen clears the session only once a
+  // new address has actually been probed, so backing out here is harmless.
+  router.push({ name: "setup", query: { change: "1" } });
+}
 
 const bio = ref<BiometricInfo>({ available: false, enrolled: false, label: "Biometric" });
 const bioBusy = ref(false);
@@ -161,6 +212,24 @@ async function logout() {
       <p v-if="bioMessage" class="more__bio-msg">{{ bioMessage }}</p>
     </Card>
 
+    <!-- Server — native only; lets one APK be re-pointed at any Fateh HR site -->
+    <Card v-if="showServerCard" class="more__section more__server">
+      <h3>{{ t('more.server') }}</h3>
+      <p class="more__server-host">
+        {{ serverHost ? t('more.current_server', { host: serverHost }) : '—' }}
+      </p>
+      <p class="more__hint">{{ t('more.change_server_hint') }}</p>
+      <AppButton
+        block
+        :variant="serverArmed ? 'destructive' : 'ghost'"
+        class="more__server-btn"
+        @click="changeServer"
+      >
+        {{ serverArmed ? t('more.change_server_arm') : t('more.change_server') }}
+      </AppButton>
+      <p v-if="serverMessage" class="more__server-msg">{{ serverMessage }}</p>
+    </Card>
+
     <Card class="more__section">
       <h3>{{ t('more.language') }}</h3>
       <div class="more__lang-row">
@@ -268,5 +337,16 @@ async function logout() {
 .more__bio-msg {
   margin: 10px 0 0;
   font-size: 12px; color: var(--ink-secondary);
+}
+
+.more__server-host {
+  margin: 0 0 6px;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--ink-primary); word-break: break-all;
+}
+.more__server-btn { margin-top: 12px; }
+.more__server-msg {
+  margin: 10px 0 0;
+  font-size: 12px; line-height: 1.45; color: var(--danger);
 }
 </style>

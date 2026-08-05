@@ -61,35 +61,57 @@ async function ensureDir(p) {
   await fs.mkdir(p, { recursive: true });
 }
 
-// Real customer logo, if provided at customers/logo.<slug>.png. When absent we
-// fall back to the generated khatam glyph, so tenants without a supplied logo
-// still build. Provide a high-res square PNG (≥512px, transparent background).
+// Foreground artwork, in priority order:
+//   1. customers/logo.<slug>.png  — this tenant's own mark
+//   2. customers/logo.default.png — the Fateh HR mark (product default)
+//   3. the generated khatam glyph — last resort, if neither file is present
+//
+// Provide a high-res square PNG (≥512px, transparent background).
 const slug = (process.env.CUSTOMER_SLUG || "").trim();
-const logoSrc = slug ? path.join(repoRoot, "customers", `logo.${slug}.png`) : null;
-let useLogo = false;
+const customerLogo = slug ? path.join(repoRoot, "customers", `logo.${slug}.png`) : null;
+const defaultLogo = path.join(repoRoot, "customers", "logo.default.png");
+let logoSrc = null;
 
-async function logoExists() {
-  if (!logoSrc) return false;
+async function exists(p) {
+  if (!p) return false;
   try {
-    await fs.access(logoSrc);
+    await fs.access(p);
     return true;
   } catch {
     return false;
   }
 }
 
-// Foreground glyph for icons/splash: the customer logo, else the generated
+/** Returns the label to log, so a build says out loud which mark it used. */
+async function resolveLogo() {
+  if (await exists(customerLogo)) {
+    logoSrc = customerLogo;
+    return `🖼️  Using tenant logo ${path.relative(repoRoot, customerLogo)}`;
+  }
+  if (await exists(defaultLogo)) {
+    logoSrc = defaultLogo;
+    return `🖼️  No logo for "${slug || "(no slug)"}" — using default ${path.relative(repoRoot, defaultLogo)}`;
+  }
+  logoSrc = null;
+  return "✏️  No logo files found — using generated khatam glyph";
+}
+
+// Foreground glyph for icons/splash: the resolved logo, else the generated
 // khatam star. Returns sharp composite descriptors, always centered.
 //
-// The supplied logo (customers/logo.<slug>.png) is expected to be PRE-SAFE-ZONED
-// — i.e. the artwork already sits within the central ~66% of a square,
-// transparent canvas, exactly like an Android adaptive-icon foreground. We
-// therefore place it at FULL canvas size (no extra shrink); shrinking a
-// pre-padded logo again would leave the glyph tiny inside the launcher mask.
-// Pair it with a matching CUSTOMER_PRIMARY_COLOR so the padding blends into the
-// adaptive background.
+// The supplied logo must be PRE-SAFE-ZONED — the artwork sitting within the
+// central ~66% of a square, transparent canvas, exactly like an Android
+// adaptive-icon foreground. Both logo.default.png and logo.cooperheat.png measure
+// at exactly 66.0% linear / 43.6% area, centered, which is what appicon.co and
+// similar tools emit for `adaptive-foreground`. We therefore place the artwork at
+// FULL canvas size (no extra shrink); shrinking a pre-padded logo again would
+// leave the glyph tiny inside the launcher mask. Pair it with a matching
+// CUSTOMER_PRIMARY_COLOR so the padding blends into the adaptive background.
+//
+// Composited previews look like a tile inset in the accent — that is correct.
+// The launcher masks down to roughly the safe zone on device.
 async function glyphInputs(size) {
-  if (useLogo) {
+  if (logoSrc) {
     const buf = await sharp(logoSrc)
       .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
@@ -101,7 +123,6 @@ async function glyphInputs(size) {
 
 async function writeAdaptiveIcon(dir, size) {
   await ensureDir(dir);
-  // Solid accent background
   await sharp({
     create: { width: size, height: size, channels: 4, background: accent },
   })
@@ -165,8 +186,7 @@ async function writeIcLauncherBackground() {
 }
 
 async function main() {
-  useLogo = await logoExists();
-  console.log(useLogo ? `🖼️  Using logo ${path.relative(repoRoot, logoSrc)}` : "✏️  No customer logo — using generated khatam glyph");
+  console.log(await resolveLogo());
   for (const [dir, size] of Object.entries(densities)) {
     await writeAdaptiveIcon(path.join(resDir, dir), size);
   }
