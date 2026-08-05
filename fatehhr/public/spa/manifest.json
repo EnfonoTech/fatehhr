@@ -1,10 +1,10 @@
 {
-  "name": "Cooperheat",
-  "short_name": "Cooperheat",
+  "name": "Fateh HR Demo",
+  "short_name": "Fateh HR Dem",
   "start_url": "/assets/fatehhr/spa/index.html",
   "display": "standalone",
   "background_color": "#FAF7F2",
-  "theme_color": "#CE0A0D",
+  "theme_color": "#2E5D5A",
   "icons": [
     {
       "src": "/assets/fatehhr/spa/icons/icon-192.png",
