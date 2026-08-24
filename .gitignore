@@ -8,3 +8,6 @@ dist/
 
 # tsc no longer emits (tsconfig noEmit); these were compiled duplicates of the .ts
 frontend/plugins/*.js
+.agentsync/
+graphify-out/
+.graphifyignore
