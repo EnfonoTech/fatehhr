@@ -1,6 +1,7 @@
 from datetime import timezone
 
 import frappe
+from fatehhr.utils.project_label import project_label
 from dateutil.parser import isoparse
 from frappe.utils import add_to_date, now_datetime, get_system_timezone
 
@@ -256,7 +257,7 @@ def assigned_sites(date: str | None = None) -> list[dict]:
 				)
 	out = []
 	for p in projects:
-		out.append({"project": p, "project_name": frappe.db.get_value("Project", p, "project_name") or p})
+		out.append({"project": p, "project_name": project_label(p)})
 	return out
 
 
@@ -294,7 +295,7 @@ def open_checkin() -> dict:
 		"name": open_in.name,
 		"time": _naive_site_to_utc_iso(open_in.time),
 		"custom_project": proj,
-		"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+		"project_name": project_label(proj),
 		# Check-in selfie so the check-OUT screen can show what was captured at IN.
 		"custom_selfie": open_in.get("custom_selfie") if has_selfie else None,
 	}
