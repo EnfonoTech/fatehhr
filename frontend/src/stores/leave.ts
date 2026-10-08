@@ -78,7 +78,7 @@ export const useLeaveStore = defineStore("leave", {
       const photoId = ca?.required === "Yes" ? ca.photo_id : null;
       if (sync.isOnline) {
         try {
-          const attachment = photoId ? await uploadPhoto(photoId) : undefined;
+          const attachment = photoId ? await uploadPhoto(photoId, { isPrivate: true }) : undefined;
           const r = await leaveApi.apply({ ...payload, client_approval_attachment: attachment });
           await this.loadMine();
           return { mode: "online" as const, row: r };

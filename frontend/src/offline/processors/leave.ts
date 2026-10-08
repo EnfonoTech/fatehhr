@@ -10,7 +10,7 @@ registerProcessor("leave", async (entry: QueueRecord) => {
   };
   // Same single uploader as the online path (idempotent: cached server URL).
   if (!p.client_approval_attachment && client_approval_photo_id) {
-    p.client_approval_attachment = await uploadPhoto(client_approval_photo_id);
+    p.client_approval_attachment = await uploadPhoto(client_approval_photo_id, { isPrivate: true });
   }
   await apiCall("POST", "fatehhr.api.leave.apply", p);
 });

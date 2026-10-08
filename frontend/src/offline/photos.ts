@@ -29,7 +29,8 @@ export async function removePhoto(id: string): Promise<void> {
  * - Idempotent: a second call for the same photo id returns the cached URL.
  * - On network failure, throws; caller decides what to do.
  */
-export async function uploadPhoto(photoId: string): Promise<string> {
+/** `isPrivate` for documents only the owner and HR should open (e.g. client approval evidence). */
+export async function uploadPhoto(photoId: string, opts: { isPrivate?: boolean } = {}): Promise<string> {
   const db = await openDb();
   const row = (await db.get(STORE.photos, photoId)) as PhotoRecord | undefined;
   if (!row) throw new Error(`photo blob missing: ${photoId}`);
@@ -38,7 +39,7 @@ export async function uploadPhoto(photoId: string): Promise<string> {
   const session = useSessionStore();
   const form = new FormData();
   form.append("file", row.blob, `${photoId.replace(":", "-")}.jpg`);
-  form.append("is_private", "0");
+  form.append("is_private", opts.isPrivate ? "1" : "0");
 
   const headers: Record<string, string> = {};
   if (session.apiKey && session.apiSecret) {
