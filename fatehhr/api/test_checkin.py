@@ -137,7 +137,10 @@ class TestCheckinIdempotency(FrappeTestCase):
 		self.assertEqual(self._count("OUT"), 1)
 
 	def test_same_type_after_60s_allowed(self):
-		a = self._create("IN", self.base)
-		b = self._create("IN", self.base + timedelta(seconds=90))
+		# OUT -> OUT rather than IN -> IN: sites such as Cooperheat refuse a
+		# second IN while one is open, which is a different rule.
+		self._create("IN", self.base)
+		a = self._create("OUT", self.base + timedelta(seconds=30))
+		b = self._create("OUT", self.base + timedelta(seconds=120))
 		self.assertNotEqual(a["name"], b["name"])
-		self.assertEqual(self._count("IN"), 2)
+		self.assertEqual(self._count("OUT"), 2)
