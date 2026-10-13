@@ -319,6 +319,20 @@ def assigned_sites(date: str | None = None) -> list[dict]:
 	return out
 
 
+# A working day never exceeds this many hours (client rule), so an IN older than
+# this is not an open shift any more.
+MAX_SHIFT_HOURS = 16
+
+
+def _shift_window_start():
+	"""Earliest time an open shift can have started: the start of today or
+	MAX_SHIFT_HOURS ago, whichever is earlier (a night shift opened yesterday
+	evening is still open after midnight)."""
+	from frappe.utils import add_to_date, get_datetime, now_datetime, today
+
+	return min(get_datetime(today() + " 00:00:00"), add_to_date(now_datetime(), hours=-MAX_SHIFT_HOURS))
+
+
 @frappe.whitelist()
 def open_checkin() -> dict:
 	"""The current open IN (no matching OUT yet) for today + its site, so the
@@ -336,7 +350,7 @@ def open_checkin() -> dict:
 		fields.append("custom_selfie")
 	rows = frappe.get_all(
 		"Employee Checkin",
-		filters={"employee": employee, "time": ["between", [today() + " 00:00:00", today() + " 23:59:59"]]},
+		filters={"employee": employee, "time": [">=", _shift_window_start()]},
 		fields=fields,
 		order_by="time asc",
 	)
@@ -372,25 +386,26 @@ def today_summary() -> dict:
 	if not employee:
 		return {"worked_seconds": 0, "open_since": None}
 
-	from frappe.utils import today
-	rows = frappe.db.sql(
-		"""
-		SELECT log_type, time
-		FROM `tabEmployee Checkin`
-		WHERE employee=%s AND DATE(time)=%s
-		ORDER BY time ASC
-		""",
-		(employee, today()),
-		as_dict=True,
+	from frappe.utils import get_datetime, today
+	# From the start of the window an open night shift can reach back to.
+	rows = frappe.get_all(
+		"Employee Checkin",
+		filters={"employee": employee, "time": [">=", _shift_window_start()]},
+		fields=["log_type", "time"],
+		order_by="time asc",
 	)
 
+	today_start = get_datetime(today() + " 00:00:00")
 	total = 0
 	open_from = None
 	for r in rows:
 		if r["log_type"] == "IN":
 			open_from = r["time"]
 		elif r["log_type"] == "OUT" and open_from is not None:
-			total += max(0, (r["time"] - open_from).total_seconds())
+			# A shift that ended before today does not belong on today's card;
+			# one that ended this morning (night shift) does.
+			if r["time"] >= today_start:
+				total += max(0, (r["time"] - open_from).total_seconds())
 			open_from = None
 
 	return {
