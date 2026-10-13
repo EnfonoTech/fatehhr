@@ -56,13 +56,48 @@ export async function secureRemove(key: string): Promise<void> {
   localStorage.removeItem(key);
 }
 
-export async function getCurrentCoords(): Promise<{ latitude: number; longitude: number } | null> {
+type Coords = { latitude: number; longitude: number };
+
+/** Reject after `ms`. The Android plugin (@capacitor/geolocation 6.x) ignores
+ *  `timeout` for getCurrentPosition, so we enforce our own bound. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("location timeout")), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+async function tryPosition(opts: {
+  enableHighAccuracy: boolean;
+  maximumAge: number;
+  timeout: number;
+}): Promise<Coords | null> {
   try {
-    const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 8000 });
+    const pos = await withTimeout(Geolocation.getCurrentPosition(opts), opts.timeout + 2000);
     return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
   } catch {
     return null;
   }
+}
+
+/**
+ * Current position, or null. Two attempts:
+ *  1. High accuracy (GPS), accepting a fix up to 30 s old. On Android the
+ *     plugin returns the OS last-known fix instantly when it is younger than
+ *     `maximumAge`; with the old default (0) it always forced a fresh GPS fix,
+ *     which indoors often comes back null ("location unavailable").
+ *  2. Fallback: low accuracy (network / Wi-Fi / cell, "balanced power"),
+ *     accepting a fix up to 5 min old. Works indoors and when the user granted
+ *     only "approximate" location.
+ */
+export async function getCurrentCoords(): Promise<Coords | null> {
+  return (
+    (await tryPosition({ enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 })) ??
+    (await tryPosition({ enableHighAccuracy: false, maximumAge: 300_000, timeout: 10_000 }))
+  );
 }
 
 export async function takePhotoBlob(): Promise<{ blob: Blob; mime: string } | null> {
