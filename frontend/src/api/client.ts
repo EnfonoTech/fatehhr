@@ -7,6 +7,58 @@ export class ApiError extends Error {
   }
 }
 
+/** Drop Frappe's Python exception prefix, e.g.
+ * "frappe.exceptions.ValidationError: Foo" → "Foo". */
+export function stripExceptionPrefix(s: string): string {
+  return s.replace(/^\s*(?:[\w]+\.)*\w*(?:Error|Exception)\s*:\s*/, "").trim();
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Best human-readable message from a Frappe error response body.
+ * Order: `_server_messages` (what frappe.throw / msgprint showed) →
+ * string `message` → `exception` with the Python class prefix stripped.
+ */
+export function readableServerMessage(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as { _server_messages?: string; message?: unknown; exception?: string };
+  if (b._server_messages) {
+    try {
+      const msgs = (JSON.parse(b._server_messages) as string[])
+        .map((raw) => {
+          try {
+            const m = JSON.parse(raw) as { message?: string } | string;
+            return typeof m === "string" ? m : m?.message ?? "";
+          } catch {
+            return raw;
+          }
+        })
+        .map((m) => stripExceptionPrefix(stripHtml(String(m))))
+        .filter(Boolean);
+      if (msgs.length) return msgs.join("\n");
+    } catch {
+      /* malformed — fall through */
+    }
+  }
+  if (typeof b.message === "string" && b.message.trim()) {
+    return stripExceptionPrefix(stripHtml(b.message));
+  }
+  if (typeof b.exception === "string" && b.exception.trim()) {
+    return stripExceptionPrefix(stripHtml(b.exception)) || null;
+  }
+  return null;
+}
+
+/** Message to show the user for any thrown value. */
+export function errorMessage(e: unknown, fallback = "error"): string {
+  if (e instanceof ApiError) return e.message || fallback;
+  const m = (e as Error)?.message;
+  return m ? stripExceptionPrefix(m) || fallback : fallback;
+}
+
 function stripRetry(b: unknown): unknown {
   if (!b || typeof b !== "object") return b;
   const { __retry: _unused, ...rest } = b as Record<string, unknown>;
@@ -58,8 +110,7 @@ export async function apiCall<T = unknown>(
   }
 
   if (!resp.ok) {
-    const d = data as { exception?: string; message?: string } | undefined;
-    const msg = d?.exception || d?.message || resp.statusText;
+    const msg = readableServerMessage(data) || resp.statusText || `HTTP ${resp.status}`;
     if (resp.status === 401) session.clear();
     throw new ApiError(resp.status, data, msg);
   }

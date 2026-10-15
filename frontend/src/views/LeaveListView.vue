@@ -11,6 +11,8 @@ import AppButton from "@/components/Button.vue";
 import BottomSheet from "@/components/BottomSheet.vue";
 import { useLeaveStore } from "@/stores/leave";
 import type { LeaveRow } from "@/api/leave";
+import { errorMessage } from "@/api/client";
+import { API_BASE } from "@/app/platform";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -31,12 +33,23 @@ function variantFor(status: string) {
   return m[status] ?? "neutral";
 }
 
+/** Client approval status label (cooperheat sites); null when not applicable. */
+function clientApprovalLabel(r: LeaveRow): string | null {
+  if (r.custom_client_approval_required !== "Yes") return null;
+  return r.custom_client_approval_received === "Yes"
+    ? t("leave.client_approval_status_received")
+    : t("leave.client_approval_status_pending");
+}
+function fileHref(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `${API_BASE()}${url}`;
+}
+
 async function cancel(name: string) {
   if (!confirm(t("leave.cancel_confirm"))) return;
   try {
     await store.cancel(name);
   } catch (e) {
-    alert((e as Error)?.message || "error");
+    alert(errorMessage(e));
   }
 }
 </script>
@@ -75,6 +88,18 @@ async function cancel(name: string) {
           <div><dt>{{ t('leave.days') }}</dt><dd>{{ selected.total_leave_days }}</dd></div>
           <div v-if="selected.half_day"><dt>{{ t('leave.half_day') }}</dt><dd>✓</dd></div>
           <div><dt>{{ t('leave.status_label') }}</dt><dd><Chip :variant="variantFor(selected.status)">{{ selected.status }}</Chip></dd></div>
+          <div v-if="clientApprovalLabel(selected)">
+            <dt>{{ t('leave.client_approval') }}</dt>
+            <dd>
+              {{ clientApprovalLabel(selected) }}
+              <a
+                v-if="selected.custom_client_approval_attachment"
+                :href="fileHref(selected.custom_client_approval_attachment)"
+                target="_blank"
+                rel="noopener"
+              >{{ t('leave.view_attachment') }}</a>
+            </dd>
+          </div>
           <div v-if="selected.description">
             <dt>{{ t('leave.reason') }}</dt><dd>{{ selected.description }}</dd>
           </div>

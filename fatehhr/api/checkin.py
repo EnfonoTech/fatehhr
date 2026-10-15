@@ -1,6 +1,7 @@
 from datetime import timezone
 
 import frappe
+from fatehhr.utils.project_label import project_label
 from dateutil.parser import isoparse
 from frappe.utils import add_to_date, now_datetime, get_system_timezone
 
@@ -13,6 +14,11 @@ from frappe.utils import add_to_date, now_datetime, get_system_timezone
 # abuse / a picker bypass). This small tolerance (minutes) absorbs device-clock
 # drift between phone and server.
 _FUTURE_SKEW_MINUTES = 2
+
+# A second punch of the SAME log_type for the same employee within this many
+# seconds of an existing one is treated as a duplicate submit (double tap,
+# queue re-drain, online+queued race) and returns the existing row.
+DUPLICATE_WINDOW_SECONDS = 60
 
 try:
 	from zoneinfo import ZoneInfo
@@ -127,6 +133,35 @@ def create(
 		if existing_name:
 			return _row_as_response(existing_name)
 
+	ts = _parse_client_ts(timestamp) or now_datetime()
+	ts = _clamp_future(ts)
+
+	# Serialise concurrent creates for this employee. Production showed 2–4 IN
+	# rows inserted within ~100 ms (multi-tap, each tap minting its own
+	# client_id, so the client_id dedupe above cannot catch them). Locking the
+	# Employee row makes the burst run one-at-a-time; the reads below are
+	# locking reads (FOR UPDATE) so they see rows committed by the request
+	# that held the lock before us, not this transaction's older snapshot.
+	frappe.db.get_value("Employee", employee, "name", for_update=True)
+	if client_id:
+		existing_name = frappe.db.get_value(
+			"Employee Checkin",
+			{"custom_client_id": client_id, "employee": employee},
+			"name",
+			for_update=True,
+		)
+		if existing_name:
+			return _row_as_response(existing_name, for_update=True)
+	# Same employee + same log_type within the window → idempotent success
+	# (return the existing row). Applies with or without client_id: old APKs
+	# send no key, and current APKs mint a fresh key per tap, so a multi-tap
+	# burst carries different keys. Never an error — an error would park the
+	# item in the offline queue as a permanent "sync error". The opposite
+	# log_type is NOT blocked (a real IN→OUT correction is allowed).
+	recent = _recent_same_type(employee, log_type, ts)
+	if recent:
+		return _row_as_response(recent, for_update=True)
+
 	t_lat = t_lng = t_rad = None
 	if task:
 		t_lat, t_lng, t_rad = frappe.db.get_value(
@@ -135,8 +170,6 @@ def create(
 		) or (None, None, None)
 	gf_status = classify(_f(t_lat), _f(t_lng), _i(t_rad), _f(latitude), _f(longitude))
 
-	ts = _parse_client_ts(timestamp) or now_datetime()
-	ts = _clamp_future(ts)
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin",
 		"employee": employee,
@@ -205,11 +238,37 @@ def create(
 	}
 
 
+def _recent_same_type(employee: str, log_type: str, ts) -> str | None:
+	"""Name of an existing checkin for `employee` with the same `log_type`
+	whose time is within DUPLICATE_WINDOW_SECONDS of `ts`, else None.
+	Locking read: must see rows committed by a concurrent request."""
+	return frappe.db.get_value(
+		"Employee Checkin",
+		{
+			"employee": employee,
+			"log_type": log_type,
+			"time": [
+				"between",
+				[
+					add_to_date(ts, seconds=-DUPLICATE_WINDOW_SECONDS),
+					add_to_date(ts, seconds=DUPLICATE_WINDOW_SECONDS),
+				],
+			],
+		},
+		"name",
+		order_by="time asc",
+		for_update=True,
+	)
+
+
 def _checkin_has(field: str) -> bool:
 	return frappe.get_meta("Employee Checkin").has_field(field)
 
 
-def _row_as_response(name: str) -> dict:
+def _row_as_response(name: str, for_update: bool = False) -> dict:
+	# for_update=True for rows found by a locking read: a plain read uses this
+	# transaction's snapshot and may not see a row a concurrent request just
+	# committed (MariaDB REPEATABLE READ).
 	fields = [
 		"name", "log_type", "time",
 		"custom_task", "custom_latitude", "custom_longitude",
@@ -219,7 +278,7 @@ def _row_as_response(name: str) -> dict:
 		fields.append("activity_log")
 	if _checkin_has("custom_project"):
 		fields.append("custom_project")
-	r = frappe.db.get_value("Employee Checkin", name, fields, as_dict=True) or {}
+	r = frappe.db.get_value("Employee Checkin", name, fields, as_dict=True, for_update=for_update) or {}
 	if r.get("time"):
 		r["time"] = _naive_site_to_utc_iso(r["time"])
 	return r
@@ -256,8 +315,22 @@ def assigned_sites(date: str | None = None) -> list[dict]:
 				)
 	out = []
 	for p in projects:
-		out.append({"project": p, "project_name": frappe.db.get_value("Project", p, "project_name") or p})
+		out.append({"project": p, "project_name": project_label(p)})
 	return out
+
+
+# A working day never exceeds this many hours (client rule), so an IN older than
+# this is not an open shift any more.
+MAX_SHIFT_HOURS = 16
+
+
+def _shift_window_start():
+	"""Earliest time an open shift can have started: the start of today or
+	MAX_SHIFT_HOURS ago, whichever is earlier (a night shift opened yesterday
+	evening is still open after midnight)."""
+	from frappe.utils import add_to_date, get_datetime, now_datetime, today
+
+	return min(get_datetime(today() + " 00:00:00"), add_to_date(now_datetime(), hours=-MAX_SHIFT_HOURS))
 
 
 @frappe.whitelist()
@@ -277,7 +350,7 @@ def open_checkin() -> dict:
 		fields.append("custom_selfie")
 	rows = frappe.get_all(
 		"Employee Checkin",
-		filters={"employee": employee, "time": ["between", [today() + " 00:00:00", today() + " 23:59:59"]]},
+		filters={"employee": employee, "time": [">=", _shift_window_start()]},
 		fields=fields,
 		order_by="time asc",
 	)
@@ -294,7 +367,7 @@ def open_checkin() -> dict:
 		"name": open_in.name,
 		"time": _naive_site_to_utc_iso(open_in.time),
 		"custom_project": proj,
-		"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+		"project_name": project_label(proj),
 		# Check-in selfie so the check-OUT screen can show what was captured at IN.
 		"custom_selfie": open_in.get("custom_selfie") if has_selfie else None,
 	}
@@ -313,25 +386,26 @@ def today_summary() -> dict:
 	if not employee:
 		return {"worked_seconds": 0, "open_since": None}
 
-	from frappe.utils import today
-	rows = frappe.db.sql(
-		"""
-		SELECT log_type, time
-		FROM `tabEmployee Checkin`
-		WHERE employee=%s AND DATE(time)=%s
-		ORDER BY time ASC
-		""",
-		(employee, today()),
-		as_dict=True,
+	from frappe.utils import get_datetime, today
+	# From the start of the window an open night shift can reach back to.
+	rows = frappe.get_all(
+		"Employee Checkin",
+		filters={"employee": employee, "time": [">=", _shift_window_start()]},
+		fields=["log_type", "time"],
+		order_by="time asc",
 	)
 
+	today_start = get_datetime(today() + " 00:00:00")
 	total = 0
 	open_from = None
 	for r in rows:
 		if r["log_type"] == "IN":
 			open_from = r["time"]
 		elif r["log_type"] == "OUT" and open_from is not None:
-			total += max(0, (r["time"] - open_from).total_seconds())
+			# A shift that ended before today does not belong on today's card;
+			# one that ended this morning (night shift) does.
+			if r["time"] >= today_start:
+				total += max(0, (r["time"] - open_from).total_seconds())
 			open_from = None
 
 	return {

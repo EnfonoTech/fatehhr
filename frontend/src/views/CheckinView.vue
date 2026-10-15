@@ -39,6 +39,11 @@ const openCheckin = ref<OpenCheckin | null>(null);
 // Defaults to now; the employee may backdate the punch up to 24h.
 const punchTime = ref<string>("");
 const busy = ref(false);
+// Set once a punch has been accepted (online or queued). Keeps the button
+// disabled for the 800 ms before we navigate home: without it the button
+// re-enabled with the flipped label (Check In → Check Out) and a re-tap
+// produced the IN/OUT-within-a-minute pairs seen in production.
+const done = ref(false);
 const message = ref<string | null>(null);
 const geofence = ref<"disabled" | "inside" | "outside" | "unknown">("unknown");
 
@@ -119,9 +124,19 @@ const nextLogType = computed<"IN" | "OUT">(() => {
   return store.currentStatus === "IN" ? "OUT" : "IN";
 });
 
+// Single entry point for the button. `busy` is claimed synchronously, BEFORE
+// any await (GPS fix, reverse-geocode, haptics), so a second tap while the
+// first is still resolving location is ignored instead of starting a parallel
+// submit with its own client_id (→ 2–4 identical rows in production).
 async function submit() {
-  if (timerMode.value) return submitTimerMode();
-  return submitCheckinMode();
+  if (busy.value || done.value) return;
+  busy.value = true;
+  try {
+    if (timerMode.value) await submitTimerMode();
+    else await submitCheckinMode();
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function submitCheckinMode() {
@@ -181,36 +196,32 @@ async function submitCheckinMode() {
     }
   }
 
-  busy.value = true;
   message.value = null;
-  try {
-    const res = await store.submit({
-      log_type: nextLogType.value,
-      latitude: lat.value,
-      longitude: lng.value,
-      address: address.value,
-      task: task.value,
-      selfie_photo_id: selfiePhotoId.value,
-      activity_log: nextLogType.value === "OUT" ? activityLog.value : null,
-      project_site: nextLogType.value === "IN" ? site.value : null,
-      adjusted_time: adjustedIso,
-    });
-    await hapticMedium();
-    message.value = res.mode === "online" ? t("checkin.done") : t("checkin.queued");
-    if (res.mode === "online" && res.row) {
-      geofence.value = res.row.custom_geofence_status;
-    }
-    selfiePhotoId.value = null;
-    activityLog.value = null;
-    punchTime.value = toLocalInput(new Date());
-    window.setTimeout(() => {
-      if (router.currentRoute.value.name === "checkin") {
-        router.replace("/");
-      }
-    }, 800);
-  } finally {
-    busy.value = false;
+  const res = await store.submit({
+    log_type: nextLogType.value,
+    latitude: lat.value,
+    longitude: lng.value,
+    address: address.value,
+    task: task.value,
+    selfie_photo_id: selfiePhotoId.value,
+    activity_log: nextLogType.value === "OUT" ? activityLog.value : null,
+    project_site: nextLogType.value === "IN" ? site.value : null,
+    adjusted_time: adjustedIso,
+  });
+  await hapticMedium();
+  message.value = res.mode === "online" ? t("checkin.done") : t("checkin.queued");
+  if (res.mode === "online" && res.row) {
+    geofence.value = res.row.custom_geofence_status;
   }
+  selfiePhotoId.value = null;
+  activityLog.value = null;
+  punchTime.value = toLocalInput(new Date());
+  done.value = true;
+  window.setTimeout(() => {
+    if (router.currentRoute.value.name === "checkin") {
+      router.replace("/");
+    }
+  }, 800);
 }
 
 // Timer-based attendance: Check-In starts a Task Timer (server writes
@@ -248,26 +259,22 @@ async function submitTimerMode() {
     }
   }
 
-  busy.value = true;
   message.value = null;
-  try {
-    if (nextLogType.value === "IN") {
-      await tasks.start(task.value as string);
-    } else {
-      await tasks.stop(activityLog.value);
-    }
-    await hapticMedium();
-    message.value = t("checkin.done");
-    selfiePhotoId.value = null;
-    activityLog.value = null;
-    window.setTimeout(() => {
-      if (router.currentRoute.value.name === "checkin") {
-        router.replace("/");
-      }
-    }, 800);
-  } finally {
-    busy.value = false;
+  if (nextLogType.value === "IN") {
+    await tasks.start(task.value as string);
+  } else {
+    await tasks.stop(activityLog.value);
   }
+  await hapticMedium();
+  message.value = t("checkin.done");
+  selfiePhotoId.value = null;
+  activityLog.value = null;
+  done.value = true;
+  window.setTimeout(() => {
+    if (router.currentRoute.value.name === "checkin") {
+      router.replace("/");
+    }
+  }, 800);
 }
 </script>
 
@@ -359,7 +366,7 @@ async function submitTimerMode() {
       <PhotoSlot v-model="selfiePhotoId" aspect="3:4" />
     </section>
 
-    <AppButton block @click="submit" :disabled="busy">
+    <AppButton block @click="submit" :disabled="busy || done">
       {{ nextLogType === 'IN' ? t('checkin.check_in') : t('checkin.check_out') }}
     </AppButton>
     <p v-if="message" class="checkin__msg">{{ message }}</p>

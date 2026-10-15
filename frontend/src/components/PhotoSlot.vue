@@ -62,7 +62,7 @@ async function onClear() {
     </label>
     <template v-else>
       <img v-if="thumbUrl" :src="thumbUrl" alt="" />
-      <button class="photoslot__remove" aria-label="Remove photo" @click="onClear">×</button>
+      <button type="button" class="photoslot__remove" aria-label="Remove photo" @click="onClear">×</button>
     </template>
   </div>
 </template>

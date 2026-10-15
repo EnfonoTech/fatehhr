@@ -25,7 +25,14 @@ export default defineConfig(({ mode }) => {
     define: {
       __BUILD_TAG__: JSON.stringify(BUILD_TAG),
     },
-    resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+    resolve: {
+      alias: { "@": path.resolve(__dirname, "src") },
+      // `vue-tsc -b` (the build script) emits a gitignored .js next to every
+      // .ts in src/. Vite's default order tries .js BEFORE .ts, so a stale
+      // emitted file silently shadows the edited source (dev, vitest, and any
+      // build not preceded by vue-tsc -b). Prefer TypeScript sources.
+      extensions: [".mjs", ".mts", ".ts", ".tsx", ".js", ".jsx", ".json"],
+    },
     plugins: [
       vue(),
       fatehhrThemePlugin(env),

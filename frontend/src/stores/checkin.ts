@@ -56,6 +56,15 @@ function writePersisted(state: PersistedState): void {
   }
 }
 
+type SubmitResult =
+  | { mode: "online"; row: CheckinRow }
+  | { mode: "queued" };
+
+// One check-in/out submit at a time. A second call while one is in flight
+// gets the SAME promise (same client_id, same outcome) instead of minting a
+// new key and creating a second Employee Checkin.
+let inFlight: Promise<SubmitResult> | null = null;
+
 export const useCheckinStore = defineStore("checkin", {
   state: () => {
     const hydrated = readPersisted();
@@ -118,7 +127,15 @@ export const useCheckinStore = defineStore("checkin", {
       await this.applyQueuedState();
     },
 
-    async submit(payload: CheckinSubmit) {
+    submit(payload: CheckinSubmit): Promise<SubmitResult> {
+      if (inFlight) return inFlight;
+      inFlight = this._submit(payload).finally(() => {
+        inFlight = null;
+      });
+      return inFlight;
+    },
+
+    async _submit(payload: CheckinSubmit): Promise<SubmitResult> {
       const sync = useSyncStore();
       // Employee-adjusted punch time wins when set (picker, bounded 24h back);
       // otherwise the real tap moment. Either way this becomes the queued

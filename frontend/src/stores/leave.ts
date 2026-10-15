@@ -1,7 +1,14 @@
 import { defineStore } from "pinia";
-import { leaveApi, type LeaveTypeBalance, type LeaveRow } from "@/api/leave";
+import {
+  leaveApi,
+  type LeaveTypeBalance,
+  type LeaveRow,
+  type ClientApprovalRequired,
+  type ClientApprovalReceived,
+} from "@/api/leave";
 import { ApiError } from "@/api/client";
 import { saveItem } from "@/offline/queue";
+import { uploadPhoto } from "@/offline/photos";
 import { useSyncStore } from "@/stores/sync";
 import { v4 as uuid } from "uuid";
 
@@ -18,6 +25,8 @@ export const useLeaveStore = defineStore("leave", {
     types: [] as LeaveTypeBalance[],
     mine: [] as LeaveRow[],
     pendingLocal: [] as PendingLocalLeave[],
+    /** Site has the cooperheat client-approval fields on Leave Application. */
+    clientApprovalEnabled: false,
   }),
   actions: {
     async loadTypes() {
@@ -25,6 +34,14 @@ export const useLeaveStore = defineStore("leave", {
         this.types = await leaveApi.types_with_balance();
       } catch {
         /* offline */
+      }
+    },
+    async loadFormConfig() {
+      try {
+        const cfg = await leaveApi.form_config();
+        this.clientApprovalEnabled = !!cfg?.client_approval;
+      } catch {
+        /* offline / older server — keep last known */
       }
     },
     async loadMine() {
@@ -41,11 +58,28 @@ export const useLeaveStore = defineStore("leave", {
       to_date: string;
       half_day: 0 | 1;
       reason: string;
+      client_approval?: {
+        required: ClientApprovalRequired;
+        received: ClientApprovalReceived;
+        photo_id: string | null;
+      } | null;
     }) {
       const sync = useSyncStore();
+      const { client_approval: ca, ...base } = p;
+      const payload = {
+        ...base,
+        ...(ca
+          ? {
+              client_approval_required: ca.required,
+              client_approval_received: ca.required === "Yes" ? ca.received : undefined,
+            }
+          : {}),
+      };
+      const photoId = ca?.required === "Yes" ? ca.photo_id : null;
       if (sync.isOnline) {
         try {
-          const r = await leaveApi.apply(p);
+          const attachment = photoId ? await uploadPhoto(photoId, { isPrivate: true }) : undefined;
+          const r = await leaveApi.apply({ ...payload, client_approval_attachment: attachment });
           await this.loadMine();
           return { mode: "online" as const, row: r };
         } catch (err) {
@@ -58,7 +92,12 @@ export const useLeaveStore = defineStore("leave", {
         }
       }
       const draftId = uuid();
-      await saveItem("leave", `leave:${draftId}`, p, []);
+      await saveItem(
+        "leave",
+        `leave:${draftId}`,
+        { ...payload, client_approval_photo_id: photoId },
+        photoId ? [photoId] : [],
+      );
       this.pendingLocal.push({
         draftId,
         leave_type: p.leave_type,

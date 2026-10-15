@@ -29,6 +29,7 @@ docs/cooperheat-approval-ui-plan.md Phase 0):
 """
 
 import frappe
+from fatehhr.utils.project_label import project_label
 from frappe import _
 from frappe.utils import cint, flt, get_datetime, now_datetime, time_diff_in_hours
 
@@ -206,7 +207,7 @@ def _day_checkins(doc) -> list[dict]:
 			"log_type": r.log_type,
 			"time": _naive_site_to_utc_iso(r.time),
 			"project": proj,
-			"project_name": (frappe.db.get_value("Project", proj, "project_name") or proj) if proj else None,
+			"project_name": project_label(proj),
 		})
 	return out
 
@@ -243,9 +244,17 @@ def update_checkin_times(name: str, edits) -> dict:
 			# Never let an approver edit a checkin outside this record's employee.
 			continue
 		cdoc = frappe.get_doc("Employee Checkin", cname)
-		cdoc.time = _parse_client_ts(t)
 		cdoc.flags.ignore_permissions = True
-		cdoc.save()  # fires cooperheat validate (overlap) + sync → re-derive site_hours
+		new_time = _parse_client_ts(t)
+		try:
+			# lifts HRMS's "Cannot Modify Time" lock on a log linked to this Attendance,
+			# then saves → cooperheat validate (48h window, overlap) + sync → re-derive site_hours
+			from cooperheat.cooperheat.api.supervisor import save_checkin_time
+
+			save_checkin_time(cdoc, new_time)
+		except ImportError:
+			cdoc.time = new_time
+			cdoc.save()
 		changed += 1
 
 	if changed:

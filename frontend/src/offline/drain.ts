@@ -11,44 +11,64 @@ export function registerProcessor(kind: string, fn: Processor) {
 
 let draining = false;
 
+const DRAIN_LOCK = "fatehhr-offline-drain";
+
+/**
+ * Non-reentrant drain. `draining` is claimed synchronously so overlapping
+ * triggers in this page (network listener + SyncBar mount + tap) never run
+ * two passes over the same queue. Where the Web Locks API exists, the pass
+ * also holds a cross-context lock (`ifAvailable`: skip, don't wait), so two
+ * open tabs/windows of the PWA can't both submit the same queued item.
+ */
 export async function drain(): Promise<void> {
   if (draining) return;
   draining = true;
   try {
-    const rows = await listPending();
-    const sorted = [...rows].sort((a, b) => {
-      const pa = prerequisiteOf(a);
-      const pb = prerequisiteOf(b);
-      if (pa && !pb) return 1;
-      if (pb && !pa) return -1;
-      return a.insertionOrder - b.insertionOrder;
-    });
-    const completed = new Set<string>();
-
-    for (const row of sorted) {
-      const p = processors.get(row.kind);
-      if (!p) continue;
-      const prereq = prerequisiteOf(row);
-      if (prereq && !completed.has(prereq) && rows.some((r) => r.logicalKey === prereq)) {
-        continue;
-      }
-      try {
-        await p(row);
-        await removeEntry(row.id);
-        completed.add(row.logicalKey);
-      } catch (e) {
-        if (isUnrecoverable(e)) {
-          await removeEntry(row.id);
-        } else {
-          await setError(row.id, {
-            code: (e as { name?: string })?.name || "Error",
-            message: (e as Error)?.message || String(e),
-          });
-        }
-      }
+    const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+    if (locks?.request) {
+      await locks.request(DRAIN_LOCK, { ifAvailable: true }, async (lock) => {
+        if (lock) await drainPass();
+      });
+    } else {
+      await drainPass();
     }
   } finally {
     draining = false;
+  }
+}
+
+async function drainPass(): Promise<void> {
+  const rows = await listPending();
+  const sorted = [...rows].sort((a, b) => {
+    const pa = prerequisiteOf(a);
+    const pb = prerequisiteOf(b);
+    if (pa && !pb) return 1;
+    if (pb && !pa) return -1;
+    return a.insertionOrder - b.insertionOrder;
+  });
+  const completed = new Set<string>();
+
+  for (const row of sorted) {
+    const p = processors.get(row.kind);
+    if (!p) continue;
+    const prereq = prerequisiteOf(row);
+    if (prereq && !completed.has(prereq) && rows.some((r) => r.logicalKey === prereq)) {
+      continue;
+    }
+    try {
+      await p(row);
+      await removeEntry(row.id);
+      completed.add(row.logicalKey);
+    } catch (e) {
+      if (isUnrecoverable(e)) {
+        await removeEntry(row.id);
+      } else {
+        await setError(row.id, {
+          code: (e as { name?: string })?.name || "Error",
+          message: (e as Error)?.message || String(e),
+        });
+      }
+    }
   }
 }
 
