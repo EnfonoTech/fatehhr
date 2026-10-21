@@ -2,7 +2,7 @@
 
 The active backend Workflow is "Attendance Approval" on Attendance, with states
 Pending Level 1/2/3 Approval -> Approved (+ Rejected), transition actions
-"Level N Approve" / "Reject". Approvers come from the Department Approval Matrix
+"Level N Approve" / "Reject". Approvers come from the employee's own reporting line
 (per level); the per-level window hours are overridden by the linked Project
 (supervisor / level_2 / manager_payroll_final approval window) else the matrix.
 An hourly scheduler auto-approves once the Level 3 window lapses.
@@ -44,9 +44,6 @@ PENDING_STATES = (
 )
 TERMINAL_STATES = ("Approved", "Rejected")
 
-# Child DocType holding the per-department approver matrix (cooperheat). Used
-# only to decide "is this user ever an approver" for tile visibility.
-APPROVAL_MATRIX_DT = "Department Approval Matrix"
 
 
 def _enabled() -> bool:
@@ -63,16 +60,24 @@ def _is_hr_manager() -> bool:
 	return "HR Manager" in frappe.get_roles(frappe.session.user)
 
 
-def _in_approval_matrix(employee: str) -> bool:
-	"""Whether the employee appears as an approver in any Department matrix."""
+def _is_reporting_approver(employee: str) -> bool:
+	"""Whether anyone reports to the employee (Direct / Immediate or Secondary
+	Reporting), or the employee is the Payroll Approver: "is this user ever an
+	approver", for tile visibility."""
 	if not employee:
 		return False
 	try:
-		if not frappe.db.exists("DocType", APPROVAL_MATRIX_DT):
-			return False
-		return bool(frappe.db.count(APPROVAL_MATRIX_DT, {"approver": employee}))
+		if frappe.db.exists("Employee", {"reports_to": employee, "status": "Active"}):
+			return True
+		if frappe.get_meta("Employee").has_field("custom_secondary_reporting") and frappe.db.exists(
+			"Employee", {"custom_secondary_reporting": employee, "status": "Active"}
+		):
+			return True
+		if frappe.db.exists("DocType", "Pay Sheet Settings"):
+			return frappe.db.get_single_value("Pay Sheet Settings", "payroll_approver") == employee
+		return False
 	except Exception:
-		# Field/doctype shape differs from the doc — fail closed, don't 500.
+		# Schema differs from what we expect: fail closed, don't 500.
 		return False
 
 
@@ -100,7 +105,7 @@ def summary() -> dict:
 		"Attendance",
 		{"current_approver": emp, "workflow_state": ["in", PENDING_STATES], "docstatus": 1},
 	)
-	is_approver = count > 0 or _in_approval_matrix(emp)
+	is_approver = count > 0 or _is_reporting_approver(emp)
 	return {"enabled": True, "is_approver": is_approver, "pending_count": count}
 
 

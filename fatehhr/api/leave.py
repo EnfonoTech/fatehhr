@@ -145,6 +145,9 @@ def cancel(name: str) -> dict:
 	doc.status = "Cancelled"
 	doc.flags.ignore_permissions = True
 	doc.save()
+	if doc.meta.has_field("workflow_state"):
+		# cooperheat's leave approval workflow: nobody can approve a cancelled request
+		frappe.db.set_value("Leave Application", doc.name, "workflow_state", "Cancelled", update_modified=False)
 	frappe.db.commit()
 	return {"name": doc.name, "status": doc.status}
 
