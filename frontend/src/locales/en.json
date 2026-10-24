@@ -354,5 +354,14 @@
     "to": "to",
     "intro": "Your request goes to your reporting person first. They can send it on until it reaches the right person.",
     "back_to_list": "Back to requests"
+  },
+  "install": {
+    "title": "Install {app} on your iPhone",
+    "step_share_before": "Tap",
+    "share": "Share",
+    "step_add_before": "then choose",
+    "add_to_home": "Add to Home Screen",
+    "open_in_safari": "Open this page in Safari, then tap Share and choose Add to Home Screen.",
+    "close": "Close"
   }
 }
