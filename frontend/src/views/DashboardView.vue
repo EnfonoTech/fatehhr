@@ -18,6 +18,7 @@ import { useNotificationStore } from "@/stores/notification";
 import { useSettingsStore } from "@/stores/settings";
 import { useSyncStore } from "@/stores/sync";
 import { useApprovalsStore } from "@/stores/approvals";
+import { useRequestStore } from "@/stores/request";
 import { CUSTOMER_BRAND_NAME } from "virtual:fatehhr-theme";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
 import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
@@ -30,6 +31,7 @@ const checkin = useCheckinStore();
 const ann = useAnnouncementStore();
 const notif = useNotificationStore();
 const settings = useSettingsStore();
+const requests = useRequestStore();
 const sync = useSyncStore();
 const approvals = useApprovalsStore();
 
@@ -110,7 +112,7 @@ const greetingKey = computed<
 });
 
 const quickActions = computed(() => {
-  const items: { to: string; label: string; icon: "leave" | "receipt" | "tasks" | "payslip" | "approvals"; badge?: number }[] = [];
+  const items: { to: string; label: string; icon: "leave" | "receipt" | "tasks" | "payslip" | "approvals" | "request"; badge?: number }[] = [];
   // Cooperheat: approvers get a Pending-Approvals tile with a live badge.
   if (CUSTOMER_APPROVALS_ENABLED && profile.profile?.is_approver) {
     items.push({
@@ -126,6 +128,10 @@ const quickActions = computed(() => {
     { to: "/tasks", label: t("tasks.title"), icon: "tasks" },
     { to: "/payslip", label: t("payslip.title"), icon: "payslip" },
   );
+  // Cooperheat: ask for anything (IT, repairs, villa ...); the request follows the reporting line
+  if (requests.enabled) {
+    items.push({ to: "/request", label: t("request.title"), icon: "request", badge: requests.waiting || undefined });
+  }
   return items;
 });
 
@@ -149,6 +155,7 @@ onMounted(async () => {
   await settings.refresh();
   await profile.load();
   if (CUSTOMER_APPROVALS_ENABLED) await approvals.loadSummary();
+  await requests.refresh();
   await pullAll();
   await ann.load(session.user ?? "");
   await notif.load();

@@ -66,3 +66,37 @@ def update_profile(**kwargs) -> dict:
 	emp.save()
 	frappe.db.commit()
 	return {"applied": applied}
+
+
+PERSONAL_FIELDS = (
+	"employee_name", "employee_number", "designation", "department", "company", "branch", "status",
+	"date_of_joining", "date_of_birth", "gender", "nationality", "marital_status", "blood_group",
+	"cell_number", "personal_email", "company_email", "current_address", "permanent_address",
+	"custom_iqama_number", "custom_id_type", "custom_expairy_date", "passport_number", "valid_upto",
+	"custom_staff_category",
+)
+
+
+@frappe.whitelist()
+def personal() -> dict:
+	"""The employee's own personal information (read-only in the app; HR changes it)."""
+	user = frappe.session.user
+	employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+	if not employee:
+		return {"employee": None, "fields": {}}
+	emp = frappe.get_doc("Employee", employee)
+	fields = {f: emp.get(f) for f in PERSONAL_FIELDS if emp.get(f) not in (None, "")}
+	reports_to = emp.get("reports_to")
+	if reports_to:
+		fields["reports_to_name"] = frappe.db.get_value("Employee", reports_to, "employee_name")
+	return {"employee": employee, "fields": {k: (str(v) if not isinstance(v, str | int | float) else v) for k, v in fields.items()}}
+
+
+@frappe.whitelist()
+def salary() -> dict:
+	"""The employee's own salary package (CTC and the current compensation), read-only."""
+	try:
+		from cooperheat.cooperheat.compensation import get_own_salary
+	except ImportError:
+		return {"allowed": False, "reason": "not enabled"}
+	return get_own_salary()

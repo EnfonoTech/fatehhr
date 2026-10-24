@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav.vue";
 import Card from "@/components/Card.vue";
 import AppButton from "@/components/Button.vue";
 import { useProfileStore } from "@/stores/profile";
+import { meApi, type SalaryPackage } from "@/api/me";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -21,7 +22,24 @@ const iban = ref("");
 const unmaskBank = ref(false);
 const msg = ref<string | null>(null);
 
-onMounted(() => store.load());
+const personal = ref<Record<string, string | number>>({});
+const salary = ref<SalaryPackage | null>(null);
+const PERSONAL_ORDER = [
+  "employee_number", "company", "branch", "date_of_joining", "date_of_birth", "gender", "nationality",
+  "marital_status", "blood_group", "cell_number", "personal_email", "company_email", "current_address",
+  "permanent_address", "custom_iqama_number", "custom_id_type", "custom_expairy_date", "passport_number",
+  "valid_upto", "reports_to_name", "custom_staff_category",
+];
+
+onMounted(async () => {
+  store.load();
+  try { personal.value = (await meApi.personal()).fields; } catch { /* offline */ }
+  try { salary.value = await meApi.salary(); } catch { /* offline */ }
+});
+
+function money(v: number | undefined, cur: string) {
+  return (v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + cur;
+}
 
 watch(
   () => store.profile,
@@ -66,6 +84,37 @@ async function save() {
       <h2>{{ store.profile.full_name }}</h2>
       <p>{{ [store.profile.designation, store.profile.department].filter(Boolean).join(' · ') }}</p>
     </header>
+
+    <Card v-if="Object.keys(personal).length">
+      <h3>{{ t('profile.personal') }}</h3>
+      <dl class="profile__facts">
+        <template v-for="k in PERSONAL_ORDER" :key="k">
+          <template v-if="personal[k]"><dt>{{ t(`profile.f.${k}`) }}</dt><dd>{{ personal[k] }}</dd></template>
+        </template>
+      </dl>
+    </Card>
+
+    <Card v-if="salary?.allowed">
+      <h3>{{ t('profile.salary') }}</h3>
+      <p class="profile__note">{{ t('profile.salary_note') }}</p>
+      <dl class="profile__facts">
+        <template v-if="salary.ctc"><dt>{{ t('profile.ctc') }}</dt><dd>{{ money(salary.ctc, salary.current?.currency ?? 'SAR') }}</dd></template>
+        <template v-if="salary.current">
+          <dt>{{ t('profile.effective_from') }}</dt><dd>{{ salary.current.from_date }}</dd>
+          <dt class="profile__group">{{ t('profile.earnings') }}</dt><dd></dd>
+          <template v-for="e in salary.current.earnings" :key="e.label"><dt>{{ e.label }}</dt><dd>{{ money(e.value, salary.current.currency) }}</dd></template>
+          <dt><b>{{ t('profile.total_earnings') }}</b></dt><dd><b>{{ money(salary.current.total_earnings, salary.current.currency) }}</b></dd>
+          <template v-if="salary.current.deductions.length">
+            <dt class="profile__group">{{ t('profile.deductions') }}</dt><dd></dd>
+            <template v-for="d in salary.current.deductions" :key="d.label"><dt>{{ d.label }}</dt><dd>{{ money(d.value, salary.current.currency) }}</dd></template>
+            <dt><b>{{ t('profile.total_deductions') }}</b></dt><dd><b>{{ money(salary.current.total_deductions, salary.current.currency) }}</b></dd>
+          </template>
+          <dt><b>{{ t('profile.net_fixed') }}</b></dt><dd><b>{{ money(salary.current.net_fixed, salary.current.currency) }}</b></dd>
+        </template>
+      </dl>
+      <p v-if="!salary.current && !salary.ctc" class="profile__note">{{ t('profile.no_salary') }}</p>
+      <AppButton variant="secondary" block @click="router.push('/payslip')">{{ t('profile.payslips') }}</AppButton>
+    </Card>
 
     <Card>
       <h3>{{ t('profile.emergency') }}</h3>
@@ -114,5 +163,10 @@ input {
   background: var(--bg-sunk); border: 0; border-radius: var(--r-md);
   padding: 12px; font-size: 15px; color: var(--ink-primary);
 }
+.profile__facts { display: grid; grid-template-columns: 1fr 1.2fr; gap: 6px 12px; margin: 0 0 8px; font-size: 14px; }
+.profile__facts dt { color: var(--ink-secondary); }
+.profile__facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.profile__group { grid-column: 1 / -1; margin-top: 6px; font-weight: 600; color: var(--ink-primary) !important; }
+.profile__note { color: var(--ink-secondary); font-size: 13px; margin: 0 0 8px; }
 .profile__msg { color: var(--ink-secondary); font-size: 13px; text-align: center; }
 </style>
