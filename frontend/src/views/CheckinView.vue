@@ -17,6 +17,7 @@ import { getCurrentCoords, hapticMedium, hapticError } from "@/app/frappe";
 import { utilApi } from "@/api/util";
 import { classify } from "@/offline/geofence-shim";
 import { CUSTOMER_SELFIE_MODE } from "virtual:fatehhr-theme";
+import { forgotCheckout } from "@/app/forgot-checkout";
 
 const { t } = useI18n();
 const store = useCheckinStore();
@@ -58,14 +59,18 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 // Lower bound = 24h before now (spec §7 fixed 24h employee window); upper = now.
-const punchMin = computed(() => toLocalInput(new Date(Date.now() - 24 * 60 * 60 * 1000)));
-const punchMax = computed(() => toLocalInput(new Date()));
+// A forgotten check-out narrows the window to that shift (see forgotCheckout).
+const punchMin = computed(() =>
+  toLocalInput(new Date(forgot.value ? forgot.value.minMs : Date.now() - 24 * 60 * 60 * 1000)),
+);
+const punchMax = computed(() => toLocalInput(new Date(forgot.value ? forgot.value.maxMs : Date.now())));
 
 onMounted(async () => {
   await settings.refresh();
   await store.refreshToday();
   // Default the punch time to now; the employee may backdate up to 24h.
-  punchTime.value = toLocalInput(new Date());
+  // A forgotten check-out starts empty: the employee must say when they finished.
+  punchTime.value = forgot.value ? "" : toLocalInput(new Date());
   // Cooperheat multi-site: sites for the IN picker; open IN's site for OUT label.
   try {
     siteOptions.value = await checkinApi.assignedSites();
@@ -124,6 +129,16 @@ const nextLogType = computed<"IN" | "OUT">(() => {
   return store.currentStatus === "IN" ? "OUT" : "IN";
 });
 
+// Last punch is an IN from an earlier shift that was never closed.
+const forgot = computed(() =>
+  !timerMode.value && nextLogType.value === "OUT" ? forgotCheckout(store.lastRow) : null,
+);
+const forgotDayLabel = computed(() =>
+  forgot.value
+    ? new Date(forgot.value.inMs).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "",
+);
+
 // Single entry point for the button. `busy` is claimed synchronously, BEFORE
 // any await (GPS fix, reverse-geocode, haptics), so a second tap while the
 // first is still resolving location is ignored instead of starting a parallel
@@ -157,7 +172,21 @@ async function submitCheckinMode() {
   // real tap moment. Enforce the 24h lower bound + no-future here too (the
   // input's min/max is not honoured by every mobile keyboard).
   let adjustedIso: string | null = null;
-  if (punchTime.value) {
+  if (forgot.value) {
+    // Closing a forgotten shift: the finish time is required and must fall inside it.
+    const chosenMs = punchTime.value ? new Date(punchTime.value).getTime() : NaN;
+    if (forgot.value.tooOld) {
+      await hapticError();
+      message.value = t("checkin.forgot_too_old");
+      return;
+    }
+    if (Number.isNaN(chosenMs) || chosenMs < forgot.value.minMs - 60_000 || chosenMs > forgot.value.maxMs + 60_000) {
+      await hapticError();
+      message.value = t("checkin.forgot_pick_time");
+      return;
+    }
+    adjustedIso = new Date(chosenMs).toISOString();
+  } else if (punchTime.value) {
     const chosenMs = new Date(punchTime.value).getTime();
     const nowMs = Date.now();
     if (Number.isNaN(chosenMs)) {
@@ -312,7 +341,10 @@ async function submitTimerMode() {
     <!-- Employee time-adjust: backdate the punch up to 24h (checkin mode only) -->
     <section v-if="!timerMode" class="checkin__time">
       <h3>{{ t('checkin.time') }}</h3>
-      <p class="checkin__time-hint">{{ t('checkin.time_hint') }}</p>
+      <p v-if="forgot" class="checkin__forgot">
+        {{ t(forgot.tooOld ? 'checkin.forgot_too_old' : 'checkin.forgot_hint', { since: forgotDayLabel }) }}
+      </p>
+      <p v-else class="checkin__time-hint">{{ t('checkin.time_hint') }}</p>
       <input
         v-model="punchTime"
         type="datetime-local"
@@ -434,6 +466,7 @@ async function submitTimerMode() {
 .checkin__site-readonly strong { color: var(--ink-primary); }
 .checkin__time h3 { font-family: var(--font-display); font-size: 17px; margin: 16px 0 4px; font-weight: 400; }
 .checkin__time-hint { color: var(--ink-secondary); font-size: 13px; margin: 0 0 8px; }
+.checkin__forgot { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; background: #fff4e5; color: #8a4b00; border: 1px solid #f3c98b; }
 .checkin__time-input {
   width: 100%; box-sizing: border-box; padding: 12px; font: inherit;
   color: var(--ink-primary); background: var(--bg-surface);

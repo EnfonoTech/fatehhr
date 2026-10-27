@@ -28,7 +28,19 @@ export interface SiteHour {
   project_name: string | null;
   check_in_time: string | null;
   check_out_time: string | null;
+  /** Payable hours (Cooperheat), else the site's hours. */
   hours: number;
+  /** Cooperheat: row number + billing (absent on other accounts). */
+  idx?: number;
+  billable_hours?: number;
+  is_billable?: number;
+}
+
+export interface SiteHoursEdit {
+  idx: number;
+  payable_hours: number;
+  is_billable: number;
+  billable_hours: number;
 }
 
 /** A raw Employee Checkin log for the day — the editable source of truth. */
@@ -71,6 +83,11 @@ export const approvalsApi = {
     apiCall<ApprovalActionResult>("POST", "fatehhr.api.approvals.reject", {
       name,
       reason: reason ?? null,
+    }),
+  updateSiteHours: (name: string, rows: SiteHoursEdit[]) =>
+    apiCall<ApprovalRow>("POST", "fatehhr.api.approvals.update_site_hours", {
+      name,
+      rows: JSON.stringify(rows),
     }),
   updateCheckinTimes: (name: string, edits: { checkin: string; time: string }[]) =>
     apiCall<ApprovalRow>("POST", "fatehhr.api.approvals.update_checkin_times", {
