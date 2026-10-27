@@ -182,7 +182,11 @@ def _site_hours(doc) -> list[dict]:
 			"project_name": r.get("project_name"),
 			"check_in_time": _naive_site_to_utc_iso(r.get("check_in_time")),
 			"check_out_time": _naive_site_to_utc_iso(r.get("check_out_time")),
-			"hours": flt(r.get("hours")),
+			# Cooperheat: Payable Hours (check-ins, approver-corrected) are the worked hours;
+			# Billable Hours are a billing figure set by the supervisor.
+			"hours": flt(r.get("payroll_hours") or r.get("hours")),
+			"billable_hours": flt(r.get("hours")),
+			"is_billable": cint(r.get("is_billable")),
 		})
 	return out
 
