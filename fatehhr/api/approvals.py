@@ -61,18 +61,18 @@ def _is_hr_manager() -> bool:
 
 
 def _is_reporting_approver(employee: str) -> bool:
-	"""Whether anyone reports to the employee (Direct / Immediate or Secondary
-	Reporting), or the employee is the Payroll Approver: "is this user ever an
+	"""Whether anyone reports to the employee (Direct / Immediate, Secondary or
+	Support Reporting), or the employee is the Payroll Approver: "is this user ever an
 	approver", for tile visibility."""
 	if not employee:
 		return False
 	try:
 		if frappe.db.exists("Employee", {"reports_to": employee, "status": "Active"}):
 			return True
-		if frappe.get_meta("Employee").has_field("custom_secondary_reporting") and frappe.db.exists(
-			"Employee", {"custom_secondary_reporting": employee, "status": "Active"}
-		):
-			return True
+		meta = frappe.get_meta("Employee")
+		for field in ("custom_secondary_reporting", "custom_support_reporting"):
+			if meta.has_field(field) and frappe.db.exists("Employee", {field: employee, "status": "Active"}):
+				return True
 		if frappe.db.exists("DocType", "Pay Sheet Settings"):
 			return frappe.db.get_single_value("Pay Sheet Settings", "payroll_approver") == employee
 		return False
