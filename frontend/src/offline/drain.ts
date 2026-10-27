@@ -78,7 +78,13 @@ async function drainPass(): Promise<void> {
  */
 const UNRECOVERABLE_RE = /\b(DuplicateEntryError|LinkExistsError)\b|ValidationError:\s+Already\s+exists/;
 
+/** Thrown by a processor when the server refused the item for good. */
+export class UnrecoverableError extends Error {
+  name = "UnrecoverableError";
+}
+
 export function isUnrecoverable(e: unknown): boolean {
+  if (e instanceof UnrecoverableError) return true;
   const msg = (e as Error)?.message || String(e);
   return UNRECOVERABLE_RE.test(msg);
 }

@@ -4,9 +4,10 @@ import { createPinia, setActivePinia } from "pinia";
 const create = vi.fn();
 vi.mock("@/api/checkin", () => ({ checkinApi: { create: (p: unknown) => create(p) } }));
 const saveItem = vi.fn(async () => ({}));
+let pending: unknown[] = [];
 vi.mock("@/offline/queue", () => ({
   saveItem: (...a: unknown[]) => saveItem(...(a as [])),
-  listPending: async () => [],
+  listPending: async () => pending,
 }));
 vi.mock("@/offline/photos", () => ({ uploadPhoto: async () => "/files/x.jpg" }));
 vi.mock("@/stores/sync", () => ({
@@ -28,6 +29,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   create.mockReset();
   saveItem.mockClear();
+  pending = [];
 });
 
 describe("checkin submit idempotency", () => {
@@ -62,5 +64,32 @@ describe("checkin submit idempotency", () => {
     expect(sentKey).toBeTruthy();
     const queued = (saveItem.mock.calls[0] as unknown[])[2] as { client_id: string };
     expect(queued.client_id).toBe(sentKey);
+  });
+});
+
+describe("queued state vs the server", () => {
+  const queuedIn = (timestamp: string) => ({
+    kind: "checkin",
+    insertionOrder: 1,
+    payload: { log_type: "IN", task: null, timestamp },
+  });
+
+  it("an old queued IN that never synced does not override a newer server OUT", async () => {
+    // iOS 2026-10: a stuck IN from early October kept the button on "Check Out"
+    pending = [queuedIn("2026-10-06T13:01:00.000Z")];
+    const store = useCheckinStore();
+    store.lastRow = { name: "EMP-CKIN-9", log_type: "OUT", time: "2026-10-27T15:35:22.000Z" } as never;
+    store.currentStatus = "OUT";
+    await store.applyQueuedState();
+    expect(store.currentStatus).toBe("OUT");
+  });
+
+  it("a queued punch newer than the server's last one still wins (offline IN)", async () => {
+    pending = [queuedIn("2026-10-27T16:00:00.000Z")];
+    const store = useCheckinStore();
+    store.lastRow = { name: "EMP-CKIN-9", log_type: "OUT", time: "2026-10-27T15:35:22.000Z" } as never;
+    store.currentStatus = "OUT";
+    await store.applyQueuedState();
+    expect(store.currentStatus).toBe("IN");
   });
 });
