@@ -9,6 +9,7 @@ import Chip from "@/components/Chip.vue";
 import AppButton from "@/components/Button.vue";
 import { ApiError } from "@/api/client";
 import { useApprovalsStore } from "@/stores/approvals";
+import type { SiteHoursEdit } from "@/api/approvals";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -26,6 +27,48 @@ const message = ref<string | null>(null);
 const now = ref(Date.now());
 let tick: number | null = null;
 
+// Cooperheat billing per site row: Payable (approver may correct), Billable tick, Billable hours.
+interface HourEdit { payable: number; billable: number; ticked: boolean }
+const hourEdits = reactive<Record<number, HourEdit>>({});
+function seedHours() {
+  Object.keys(hourEdits).forEach((k) => delete hourEdits[Number(k)]);
+  for (const s of store.detail?.site_hours ?? []) {
+    if (s.idx == null || s.is_billable == null) continue;
+    hourEdits[s.idx] = { payable: s.hours, billable: s.billable_hours ?? 0, ticked: !!s.is_billable };
+  }
+}
+const billingRows = computed(() => (d.value?.site_hours ?? []).filter((s) => s.idx != null && hourEdits[s.idx!]));
+function dirtyHours(): SiteHoursEdit[] {
+  const out: SiteHoursEdit[] = [];
+  for (const s of d.value?.site_hours ?? []) {
+    const e = s.idx != null ? hourEdits[s.idx] : undefined;
+    if (!e) continue;
+    const billable = e.ticked ? e.payable : e.billable;
+    if (Number(e.payable) !== s.hours || e.ticked !== !!s.is_billable || Number(billable) !== (s.billable_hours ?? 0)) {
+      out.push({ idx: s.idx!, payable_hours: Number(e.payable) || 0, is_billable: e.ticked ? 1 : 0, billable_hours: Number(billable) || 0 });
+    }
+  }
+  return out;
+}
+async function saveHours() {
+  const rows = dirtyHours();
+  if (!rows.length) return;
+  await store.updateSiteHours(name, rows);
+  seedHours();
+}
+async function onSaveHours() {
+  busy.value = true;
+  message.value = null;
+  try {
+    await saveHours();
+    message.value = t("approvals.hours_saved");
+  } catch (e) {
+    handleErr(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 function seedEdits() {
   Object.keys(editedTimes).forEach((k) => delete editedTimes[k]);
   for (const c of store.detail?.checkins ?? []) {
@@ -37,6 +80,7 @@ onMounted(async () => {
   try {
     await store.loadDetail(name);
     seedEdits();
+    seedHours();
   } catch (e) {
     message.value = e instanceof ApiError ? serverMessage(e) || t("approvals.not_yours") : t("approvals.online_only");
   }
@@ -178,8 +222,10 @@ async function onApprove() {
   busy.value = true;
   message.value = null;
   try {
-    // Persist any time corrections first (multi-pair), then advance the workflow.
+    // Persist any time corrections first (multi-pair), then the hours typed here
+    // (a time change re-derives the rows, the approver's hours still win), then advance.
     await saveTimes();
+    await saveHours();
     const res = await store.approve(d.value.name);
     armedApprove.value = false;
     if (res.workflow_state === "Approved") {
@@ -262,6 +308,38 @@ async function onReject() {
         </AppButton>
       </Card>
 
+      <!-- Cooperheat: Payable / Billable per site -->
+      <Card v-if="hasCheckins && billingRows.length">
+        <h3 class="ad__h3">{{ t('approvals.hours_title') }}</h3>
+        <div v-for="s in billingRows" :key="s.idx" class="ad__pair">
+          <div class="ad__pair-head">
+            <span class="ad__pair-site">{{ s.project_name || s.project || t('approvals.pair', { n: s.idx }) }}</span>
+          </div>
+          <div class="ad__times">
+            <label class="ad__field">
+              <span class="ad__label">{{ t('approvals.payable_hours') }}</span>
+              <input type="number" min="0" max="24" step="0.25" inputmode="decimal" v-model.number="hourEdits[s.idx!].payable" :disabled="!canAct" />
+            </label>
+            <label class="ad__field">
+              <span class="ad__label">{{ t('approvals.billable_hours') }}</span>
+              <input
+                type="number" min="0" max="24" step="0.25" inputmode="decimal"
+                :value="hourEdits[s.idx!].ticked ? hourEdits[s.idx!].payable : hourEdits[s.idx!].billable"
+                @input="hourEdits[s.idx!].billable = Number(($event.target as HTMLInputElement).value)"
+                :disabled="!canAct || hourEdits[s.idx!].ticked"
+              />
+            </label>
+          </div>
+          <label class="ad__tick">
+            <input type="checkbox" v-model="hourEdits[s.idx!].ticked" :disabled="!canAct" />
+            {{ t('approvals.billable_same') }}
+          </label>
+        </div>
+        <AppButton v-if="canAct" variant="secondary" block :disabled="busy" @click="onSaveHours">
+          {{ t('approvals.save_hours') }}
+        </AppButton>
+      </Card>
+
       <!-- No raw checkins: show cooperheat-derived site-hours read-only, else empty -->
       <Card v-else>
         <template v-if="siteHours.length">
@@ -339,6 +417,7 @@ async function onReject() {
 .ad__missing { color: var(--ink-tertiary); font-size: 13px; padding: 10px 0; }
 .ad__ro { font: inherit; padding: 10px 0; color: var(--ink-primary); font-family: var(--font-mono); font-size: 14px; }
 .ad__derived { margin: -4px 0 10px; font-size: 12.5px; color: var(--ink-tertiary); }
+.ad__tick { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 14px; }
 .ad__hours { margin: 12px 0 10px; font-size: 14px; color: var(--ink-secondary); }
 .ad__hours strong { color: var(--ink-primary); font-family: var(--font-mono); }
 .ad__locked {

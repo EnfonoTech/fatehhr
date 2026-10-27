@@ -221,7 +221,13 @@
     "action_failed": "Couldn't complete that. Please try again.",
     "not_yours": "This approval is no longer assigned to you.",
     "expired_locked": "The approval window has expired — this record was auto-handled.",
-    "derived_hours": "Recorded site hours (no app check-ins)"
+    "derived_hours": "Recorded site hours (no app check-ins)",
+    "hours_title": "Hours",
+    "payable_hours": "Payable hours",
+    "billable_hours": "Billable hours",
+    "billable_same": "Billable (same as payable)",
+    "save_hours": "Save hours",
+    "hours_saved": "Hours updated."
   },
   "leave": {
     "title": "Leave",
