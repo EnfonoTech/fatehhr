@@ -99,7 +99,14 @@ export const useCheckinStore = defineStore("checkin", {
         const payload = last.payload as {
           log_type: "IN" | "OUT";
           task: string | null;
+          timestamp?: string;
         };
+        // Only a queued punch NEWER than the server's last one is the truth. An old
+        // item that cannot sync (iOS 2026-10: a stuck IN) must not keep the button
+        // on "Check Out" for days, turning every later punch into an OUT.
+        const serverAt = this.lastRow?.time ? Date.parse(this.lastRow.time) : NaN;
+        const queuedAt = payload.timestamp ? Date.parse(payload.timestamp) : NaN;
+        if (!Number.isNaN(serverAt) && !Number.isNaN(queuedAt) && queuedAt <= serverAt) return;
         this.currentStatus = payload.log_type;
         this.currentTask = payload.task;
         this._persist();
