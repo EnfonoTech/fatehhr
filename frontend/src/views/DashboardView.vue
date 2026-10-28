@@ -21,6 +21,7 @@ import { useApprovalsStore } from "@/stores/approvals";
 import { useRequestStore } from "@/stores/request";
 import { CUSTOMER_BRAND_NAME } from "virtual:fatehhr-theme";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
+import { forgotCheckout } from "@/app/forgot-checkout";
 import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 
 const { t } = useI18n();
@@ -54,22 +55,28 @@ const workedLabel = computed(() => {
   return `${h}h ${String(m).padStart(2, "0")}m`;
 });
 
+const MAX_SHIFT_HOURS = 16; // fatehhr/api/checkin.py MAX_SHIFT_HOURS
+
+// An IN older than 24 h is closed by the server: the employee is "out" (see forgotCheckout).
+const checkedIn = computed(
+  () => checkin.currentStatus === "IN" && !forgotCheckout(checkin.lastRow)?.autoClosed,
+);
+
 function computeLocalSummary(): TodaySummary {
   // Mirror the server's greedy IN→OUT pair walk, using today's rows from
   // the Pinia checkin store. `checkin.history` already merges
   // queued-offline rows with server rows, so this gives a sensible value
   // even when the /today_summary endpoint can't be reached.
-  const nowStart = new Date();
-  const y = nowStart.getFullYear();
-  const m = nowStart.getMonth();
-  const d = nowStart.getDate();
-  const todayLocal = (iso: string) => {
-    const dt = new Date(iso.replace(" ", "T"));
-    return dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d;
-  };
+  // Like the server: start from the earliest time an open night shift can have
+  // started (midnight, or MAX_SHIFT_HOURS ago), so an IN from last evening still
+  // counts after midnight; a shift is credited to today when its OUT is today.
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const windowStart = Math.min(todayStart, now.getTime() - MAX_SHIFT_HOURS * 3600 * 1000);
+  const at = (iso: string) => Date.parse(iso.replace(" ", "T"));
   // Sort ASC for pairing.
   const rows = [...checkin.history]
-    .filter((r) => r.time && todayLocal(r.time))
+    .filter((r) => r.time && at(r.time) >= windowStart)
     .sort((a, b) => (a.time < b.time ? -1 : 1));
   let total = 0;
   let openFrom: string | null = null;
@@ -77,6 +84,10 @@ function computeLocalSummary(): TodaySummary {
     if (r.log_type === "IN") {
       openFrom = r.time;
     } else if (r.log_type === "OUT" && openFrom) {
+      if (at(r.time) < todayStart) {
+        openFrom = null; // a shift that ended before today is not on today's card
+        continue;
+      }
       const s = Math.max(
         0,
         Math.floor(
@@ -194,10 +205,10 @@ onUnmounted(() => {
 
     <HeroCard class="dash__today">
       <p class="dash__today-status">
-        {{ checkin.currentStatus === 'IN' ? t('dashboard.currently_in') : t('dashboard.currently_out') }}
+        {{ checkedIn ? t('dashboard.currently_in') : t('dashboard.currently_out') }}
       </p>
       <AppButton block @click="router.push('/checkin')">
-        {{ checkin.currentStatus === 'IN' ? t('checkin.check_out') : t('checkin.check_in') }}
+        {{ checkedIn ? t('checkin.check_out') : t('checkin.check_in') }}
       </AppButton>
     </HeroCard>
 

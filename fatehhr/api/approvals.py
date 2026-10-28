@@ -61,18 +61,18 @@ def _is_hr_manager() -> bool:
 
 
 def _is_reporting_approver(employee: str) -> bool:
-	"""Whether anyone reports to the employee (Direct / Immediate or Secondary
-	Reporting), or the employee is the Payroll Approver: "is this user ever an
+	"""Whether anyone reports to the employee (Direct / Immediate, Secondary or
+	Support Reporting), or the employee is the Payroll Approver: "is this user ever an
 	approver", for tile visibility."""
 	if not employee:
 		return False
 	try:
 		if frappe.db.exists("Employee", {"reports_to": employee, "status": "Active"}):
 			return True
-		if frappe.get_meta("Employee").has_field("custom_secondary_reporting") and frappe.db.exists(
-			"Employee", {"custom_secondary_reporting": employee, "status": "Active"}
-		):
-			return True
+		meta = frappe.get_meta("Employee")
+		for field in ("custom_secondary_reporting", "custom_support_reporting"):
+			if meta.has_field(field) and frappe.db.exists("Employee", {field: employee, "status": "Active"}):
+				return True
 		if frappe.db.exists("DocType", "Pay Sheet Settings"):
 			return frappe.db.get_single_value("Pay Sheet Settings", "payroll_approver") == employee
 		return False
@@ -182,9 +182,60 @@ def _site_hours(doc) -> list[dict]:
 			"project_name": r.get("project_name"),
 			"check_in_time": _naive_site_to_utc_iso(r.get("check_in_time")),
 			"check_out_time": _naive_site_to_utc_iso(r.get("check_out_time")),
-			"hours": flt(r.get("hours")),
+			# Cooperheat: Payable Hours (check-ins, approver-corrected) are the worked hours;
+			# Billable Hours are a billing figure set by the supervisor.
+			"idx": r.get("idx"),
+			"hours": flt(r.get("payroll_hours") or r.get("hours")),
+			"billable_hours": flt(r.get("hours")),
+			"is_billable": cint(r.get("is_billable")),
 		})
 	return out
+
+
+@frappe.whitelist()
+def update_site_hours(name: str, rows) -> dict:
+	"""Approver sets, per site row, the Payable Hours and the Billable tick / Billable
+	Hours (Cooperheat, client call 2026-10-25). Same rules as update_checkin_times:
+	current-level approver (or HR Manager) of a pending record, within the window.
+	cooperheat's attendance hooks apply the tick (ticked = Billable equals Payable)
+	and recompute working hours and overtime from Payable.
+
+	`rows` = JSON list of {"idx": <row number>, "payable_hours", "is_billable", "billable_hours"}.
+	"""
+	import json
+	if not _enabled():
+		frappe.throw(_("Approvals are not enabled on this account."))
+	if not frappe.get_meta("Attendance Site Hours").has_field("is_billable"):
+		frappe.throw(_("Billable hours are not set up on this account."))
+	if isinstance(rows, str):
+		rows = json.loads(rows or "[]")
+
+	doc = _load_for_approver(name)
+	if doc.get("workflow_state") not in PENDING_STATES:
+		frappe.throw(_("This record is no longer pending approval."))
+	wx = doc.get("window_expires_at")
+	if wx and get_datetime(wx) < now_datetime() and not _is_hr_manager():
+		frappe.throw(_("The approval window has expired — hours can no longer be edited."))
+
+	by_idx = {cint(r.idx): r for r in doc.get("custom_site_hours") or []}
+	changed = False
+	for e in rows or []:
+		row = by_idx.get(cint(e.get("idx")))
+		if not row:
+			continue
+		payable, billable = flt(e.get("payable_hours"), 2), flt(e.get("billable_hours"), 2)
+		if payable < 0 or billable < 0 or payable > 24 or billable > 24:
+			frappe.throw(_("Hours must be between 0 and 24."))
+		row.payroll_hours = payable
+		row.is_billable = cint(e.get("is_billable"))
+		row.hours = payable if row.is_billable else billable
+		changed = True
+
+	if changed:
+		doc.flags.ignore_permissions = True
+		doc.save()
+		frappe.db.commit()
+	return detail(name)
 
 
 def _day_checkins(doc) -> list[dict]:

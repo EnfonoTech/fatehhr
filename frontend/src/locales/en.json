@@ -164,7 +164,10 @@
       "disabled": "No task radius set"
     },
     "checkin_details": "Check-in details",
-    "checked_in_at": "Checked in at"
+    "checked_in_at": "Checked in at",
+    "forgot_hint": "You did not check out after your shift that started {since}. Enter the time you finished work that day, then check in again.",
+    "forgot_pick_time": "Please enter the time you finished that shift (within 16 hours of your check-in; a night shift finishes the next day).",
+    "forgot_auto_closed": "Your check-in of {since} was not closed. The system closes it with 8 hours and your supervisor checks it. You can check in now."
   },
   "attendance": {
     "title": "Attendance",
@@ -218,7 +221,13 @@
     "action_failed": "Couldn't complete that. Please try again.",
     "not_yours": "This approval is no longer assigned to you.",
     "expired_locked": "The approval window has expired — this record was auto-handled.",
-    "derived_hours": "Recorded site hours (no app check-ins)"
+    "derived_hours": "Recorded site hours (no app check-ins)",
+    "hours_title": "Hours",
+    "payable_hours": "Payable hours",
+    "billable_hours": "Billable hours",
+    "billable_same": "Billable (same as payable)",
+    "save_hours": "Save hours",
+    "hours_saved": "Hours updated."
   },
   "leave": {
     "title": "Leave",
@@ -354,5 +363,14 @@
     "to": "to",
     "intro": "Your request goes to your reporting person first. They can send it on until it reaches the right person.",
     "back_to_list": "Back to requests"
+  },
+  "install": {
+    "title": "Install {app} on your iPhone",
+    "step_share_before": "Tap",
+    "share": "Share",
+    "step_add_before": "then choose",
+    "add_to_home": "Add to Home Screen",
+    "open_in_safari": "Open this page in Safari, then tap Share and choose Add to Home Screen.",
+    "close": "Close"
   }
 }

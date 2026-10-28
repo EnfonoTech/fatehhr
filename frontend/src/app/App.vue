@@ -2,6 +2,7 @@
 import { onMounted } from "vue";
 import { RouterView, useRouter } from "vue-router";
 import { installNativeBackHandler } from "./native-back";
+import InstallHint from "@/components/InstallHint.vue";
 
 const router = useRouter();
 
@@ -14,4 +15,5 @@ onMounted(() => {
 
 <template>
   <RouterView />
+  <InstallHint />
 </template>

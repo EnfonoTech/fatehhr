@@ -51,6 +51,12 @@ async function drainPass(): Promise<void> {
   for (const row of sorted) {
     const p = processors.get(row.kind);
     if (!p) continue;
+    if (isStalePunch(row)) {
+      // a punch that failed again and again for over a day will not sync any more;
+      // keeping it shows a permanent sync error and the employee taps twice
+      await removeEntry(row.id);
+      continue;
+    }
     const prereq = prerequisiteOf(row);
     if (prereq && !completed.has(prereq) && rows.some((r) => r.logicalKey === prereq)) {
       continue;
@@ -78,9 +84,26 @@ async function drainPass(): Promise<void> {
  */
 const UNRECOVERABLE_RE = /\b(DuplicateEntryError|LinkExistsError)\b|ValidationError:\s+Already\s+exists/;
 
+/** Thrown by a processor when the server refused the item for good. */
+export class UnrecoverableError extends Error {
+  name = "UnrecoverableError";
+}
+
 export function isUnrecoverable(e: unknown): boolean {
+  if (e instanceof UnrecoverableError) return true;
   const msg = (e as Error)?.message || String(e);
   return UNRECOVERABLE_RE.test(msg);
+}
+
+const STALE_PUNCH_MS = 24 * 3600 * 1000;
+const STALE_PUNCH_ATTEMPTS = 3;
+
+/** A queued check-in/out older than 24 h that already failed 3 times (Cooperheat, iPhone, 2026-10). */
+export function isStalePunch(entry: QueueRecord, now: number = Date.now()): boolean {
+  if (entry.kind !== "checkin" || (entry.attempts ?? 0) < STALE_PUNCH_ATTEMPTS) return false;
+  const ts = (entry.payload as { timestamp?: string })?.timestamp || entry.createdAt;
+  const at = ts ? Date.parse(ts) : NaN;
+  return !Number.isNaN(at) && now - at > STALE_PUNCH_MS;
 }
 
 export function isDraining() {

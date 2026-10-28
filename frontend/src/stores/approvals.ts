@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { approvalsApi, type ApprovalRow, type ApprovalSummary } from "@/api/approvals";
+import { approvalsApi, type ApprovalRow, type ApprovalSummary, type SiteHoursEdit } from "@/api/approvals";
 
 /**
  * Attendance approvals (cooperheat). Approve/Reject are deliberately
@@ -45,6 +45,12 @@ export const useApprovalsStore = defineStore("approvals", {
 
     async loadDetail(name: string) {
       this.detail = await approvalsApi.detail(name);
+    },
+
+    /** Online-only. Payable / Billable per site row; returns the refreshed detail. */
+    async updateSiteHours(name: string, rows: SiteHoursEdit[]) {
+      this.detail = await approvalsApi.updateSiteHours(name, rows);
+      return this.detail;
     },
 
     /** Online-only. Edits the raw checkin times; returns the refreshed detail. */
