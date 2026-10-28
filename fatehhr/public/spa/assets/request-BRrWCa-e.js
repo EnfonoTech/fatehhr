@@ -1,1 +1,0 @@
-import{V as t}from"./index-CN_LYX2_.js";import{r as e}from"./request-Cc0qzPP5.js";const s=t("request",{state:()=>({enabled:!1,waiting:0}),actions:{async refresh(){try{this.enabled=await e.enabled(),this.enabled&&(this.waiting=(await e.mine()).waiting.length)}catch{}}}});export{s as u};
