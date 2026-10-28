@@ -65,3 +65,22 @@ describe("drain is non-reentrant", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe("isStalePunch", () => {
+  const base = { id: "x", logicalKey: "checkin:1", effectiveImages: [], insertionOrder: 1, createdAt: "2026-10-06T13:00:00Z" };
+  it("drops a check-in that failed 3 times and is older than a day", async () => {
+    const { isStalePunch } = await import("./drain");
+    const row = { ...base, kind: "checkin", attempts: 5, payload: { timestamp: "2026-10-06T13:01:00Z" } };
+    expect(isStalePunch(row as never, Date.parse("2026-10-28T08:00:00Z"))).toBe(true);
+  });
+  it("keeps a fresh offline punch, even after failures", async () => {
+    const { isStalePunch } = await import("./drain");
+    const row = { ...base, kind: "checkin", attempts: 5, payload: { timestamp: "2026-10-28T06:00:00Z" } };
+    expect(isStalePunch(row as never, Date.parse("2026-10-28T08:00:00Z"))).toBe(false);
+  });
+  it("keeps an old punch that never tried yet (phone offline for days)", async () => {
+    const { isStalePunch } = await import("./drain");
+    const row = { ...base, kind: "checkin", attempts: 0, payload: { timestamp: "2026-10-20T06:00:00Z" } };
+    expect(isStalePunch(row as never, Date.parse("2026-10-28T08:00:00Z"))).toBe(false);
+  });
+});

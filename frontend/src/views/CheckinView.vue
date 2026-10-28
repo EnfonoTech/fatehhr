@@ -124,18 +124,23 @@ const needsSelfie = computed(() => {
 // Next action is a Check Out if:
 //   * Timer mode: there's a running timer (user is IN via timer)
 //   * Checkin mode: store.currentStatus is IN
+// Last punch is an IN from an earlier shift that was never closed.
+const forgotRaw = computed(() =>
+  !timerMode.value && store.currentStatus === "IN" ? forgotCheckout(store.lastRow) : null,
+);
+// Older than 24 h: the server closes it (8 h + note), the employee just checks in again.
+const autoClosed = computed(() => !!forgotRaw.value?.autoClosed);
+// 16 to 24 h: the Check Out screen asks when they finished.
+const forgot = computed(() => (forgotRaw.value && !forgotRaw.value.autoClosed ? forgotRaw.value : null));
+
 const nextLogType = computed<"IN" | "OUT">(() => {
   if (timerMode.value) return tasks.running ? "OUT" : "IN";
+  if (autoClosed.value) return "IN";
   return store.currentStatus === "IN" ? "OUT" : "IN";
 });
-
-// Last punch is an IN from an earlier shift that was never closed.
-const forgot = computed(() =>
-  !timerMode.value && nextLogType.value === "OUT" ? forgotCheckout(store.lastRow) : null,
-);
 const forgotDayLabel = computed(() =>
-  forgot.value
-    ? new Date(forgot.value.inMs).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  forgotRaw.value
+    ? new Date(forgotRaw.value.inMs).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "",
 );
 
@@ -175,11 +180,6 @@ async function submitCheckinMode() {
   if (forgot.value) {
     // Closing a forgotten shift: the finish time is required and must fall inside it.
     const chosenMs = punchTime.value ? new Date(punchTime.value).getTime() : NaN;
-    if (forgot.value.tooOld) {
-      await hapticError();
-      message.value = t("checkin.forgot_too_old");
-      return;
-    }
     if (Number.isNaN(chosenMs) || chosenMs < forgot.value.minMs - 60_000 || chosenMs > forgot.value.maxMs + 60_000) {
       await hapticError();
       message.value = t("checkin.forgot_pick_time");
@@ -341,9 +341,8 @@ async function submitTimerMode() {
     <!-- Employee time-adjust: backdate the punch up to 24h (checkin mode only) -->
     <section v-if="!timerMode" class="checkin__time">
       <h3>{{ t('checkin.time') }}</h3>
-      <p v-if="forgot" class="checkin__forgot">
-        {{ t(forgot.tooOld ? 'checkin.forgot_too_old' : 'checkin.forgot_hint', { since: forgotDayLabel }) }}
-      </p>
+      <p v-if="forgot" class="checkin__forgot">{{ t('checkin.forgot_hint', { since: forgotDayLabel }) }}</p>
+      <p v-else-if="autoClosed" class="checkin__forgot">{{ t('checkin.forgot_auto_closed', { since: forgotDayLabel }) }}</p>
       <p v-else class="checkin__time-hint">{{ t('checkin.time_hint') }}</p>
       <input
         v-model="punchTime"

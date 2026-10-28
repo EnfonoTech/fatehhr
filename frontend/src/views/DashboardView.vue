@@ -21,6 +21,7 @@ import { useApprovalsStore } from "@/stores/approvals";
 import { useRequestStore } from "@/stores/request";
 import { CUSTOMER_BRAND_NAME } from "virtual:fatehhr-theme";
 import { checkinApi, type TodaySummary } from "@/api/checkin";
+import { forgotCheckout } from "@/app/forgot-checkout";
 import { CUSTOMER_APPROVALS_ENABLED } from "virtual:fatehhr-theme";
 
 const { t } = useI18n();
@@ -55,6 +56,11 @@ const workedLabel = computed(() => {
 });
 
 const MAX_SHIFT_HOURS = 16; // fatehhr/api/checkin.py MAX_SHIFT_HOURS
+
+// An IN older than 24 h is closed by the server: the employee is "out" (see forgotCheckout).
+const checkedIn = computed(
+  () => checkin.currentStatus === "IN" && !forgotCheckout(checkin.lastRow)?.autoClosed,
+);
 
 function computeLocalSummary(): TodaySummary {
   // Mirror the server's greedy IN→OUT pair walk, using today's rows from
@@ -199,10 +205,10 @@ onUnmounted(() => {
 
     <HeroCard class="dash__today">
       <p class="dash__today-status">
-        {{ checkin.currentStatus === 'IN' ? t('dashboard.currently_in') : t('dashboard.currently_out') }}
+        {{ checkedIn ? t('dashboard.currently_in') : t('dashboard.currently_out') }}
       </p>
       <AppButton block @click="router.push('/checkin')">
-        {{ checkin.currentStatus === 'IN' ? t('checkin.check_out') : t('checkin.check_in') }}
+        {{ checkedIn ? t('checkin.check_out') : t('checkin.check_in') }}
       </AppButton>
     </HeroCard>
 
