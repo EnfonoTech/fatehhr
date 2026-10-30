@@ -20,10 +20,19 @@ export default defineConfig(({ mode }) => {
     pad(now.getUTCHours()) +
     pad(now.getUTCMinutes());
 
+  const bundleVersionFile = {
+    name: "fatehhr-bundle-version",
+    generateBundle(this: { emitFile: (f: object) => void }) {
+      this.emitFile({ type: "asset", fileName: "bundle-version.txt", source: BUILD_TAG.replace("-", "") });
+    },
+  };
+
   return {
     base,
     define: {
       __BUILD_TAG__: JSON.stringify(BUILD_TAG),
+      // live update (src/app/live-update.ts): the same tag as a sortable number
+      __BUNDLE_VERSION__: JSON.stringify(BUILD_TAG.replace("-", "")),
     },
     resolve: {
       alias: { "@": path.resolve(__dirname, "src") },
@@ -36,7 +45,12 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       fatehhrThemePlugin(env),
+      bundleVersionFile,
       VitePWA({
+        // Native APK: the screens are local files (and live-updated, src/app/live-update.ts); a
+        // service worker would serve old cached screens over new ones, so native builds ship one
+        // that removes itself (and the one older APKs installed).
+        selfDestroying: env.CUSTOMER_BUILD_TARGET === "native",
         registerType: "autoUpdate",
         injectRegister: "auto",
         strategies: "generateSW",

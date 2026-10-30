@@ -24,6 +24,15 @@ setLocale(appI18n.global.locale.value as "en" | "ar");
 
 app.mount("#app");
 
+// Live update (Cooperheat option 2): switch to screens downloaded last time, confirm that the
+// running screens started, and look for newer ones once the app has settled.
+void (async () => {
+  const lu = await import("@/app/live-update");
+  if (await lu.applyDownloadedBundle()) return; // the page reloads into the new screens
+  await lu.markBundleReady();
+  window.setTimeout(() => void lu.checkForUpdate(), 15_000);
+})();
+
 // ---- post-mount wiring ----
 
 const session = useSessionStore();

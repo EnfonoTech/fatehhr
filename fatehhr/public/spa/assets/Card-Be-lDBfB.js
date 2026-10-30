@@ -1,1 +1,0 @@
-import{y as c,b as s,c as o,E as r}from"./index-BOZTGFwy.js";const t={},a={class:"card"};function n(e,d){return s(),o("div",a,[r(e.$slots,"default",{},void 0)])}const f=c(t,[["render",n],["__scopeId","data-v-e9587e4c"]]);export{f as C};

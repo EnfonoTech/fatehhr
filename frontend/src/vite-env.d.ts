@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 declare const __BUILD_TAG__: string;
+declare const __BUNDLE_VERSION__: string;
 
 declare module "virtual:fatehhr-theme" {
   export const CUSTOMER_ERP_DOMAIN: string;

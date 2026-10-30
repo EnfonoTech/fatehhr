@@ -37,8 +37,16 @@ const openSiteName = ref<string | null>(null);
 // The open check-IN itself (time + selfie), shown read-only on the check-OUT screen.
 const openCheckin = ref<OpenCheckin | null>(null);
 // Employee time-adjust: local-wall-clock "YYYY-MM-DDTHH:mm" for <input datetime-local>.
-// Defaults to now; the employee may backdate the punch up to 24h.
-const punchTime = ref<string>("");
+// Defaults to now; the employee may backdate the punch up to 24h. Filled at once (not after
+// the first server calls): on a weak site connection a time picked while the screen was
+// still loading used to be overwritten with "now" (client, 29 Oct).
+const punchTime = ref<string>(toLocalInput(new Date()));
+// The employee changed the time: from then on nothing overwrites it.
+const punchTouched = ref(false);
+function onPunchInput(e: Event) {
+  punchTouched.value = true;
+  punchTime.value = (e.target as HTMLInputElement).value;
+}
 const busy = ref(false);
 // Set once a punch has been accepted (online or queued). Keeps the button
 // disabled for the 800 ms before we navigate home: without it the button
@@ -64,13 +72,20 @@ const punchMin = computed(() =>
   toLocalInput(new Date(forgot.value ? forgot.value.minMs : Date.now() - 24 * 60 * 60 * 1000)),
 );
 const punchMax = computed(() => toLocalInput(new Date(forgot.value ? forgot.value.maxMs : Date.now())));
+// Shown under the picker when the time differs from now, so the employee sees what is saved.
+const savedAtLabel = computed(() => {
+  if (!punchTime.value) return null;
+  const ms = new Date(punchTime.value).getTime();
+  if (Number.isNaN(ms) || Math.abs(Date.now() - ms) <= 60_000) return null;
+  return new Date(ms).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+});
 
 onMounted(async () => {
   await settings.refresh();
   await store.refreshToday();
   // Default the punch time to now; the employee may backdate up to 24h.
   // A forgotten check-out starts empty: the employee must say when they finished.
-  punchTime.value = forgot.value ? "" : toLocalInput(new Date());
+  if (!punchTouched.value) punchTime.value = forgot.value ? "" : toLocalInput(new Date());
   // Cooperheat multi-site: sites for the IN picker; open IN's site for OUT label.
   try {
     siteOptions.value = await checkinApi.assignedSites();
@@ -245,6 +260,7 @@ async function submitCheckinMode() {
   selfiePhotoId.value = null;
   activityLog.value = null;
   punchTime.value = toLocalInput(new Date());
+  punchTouched.value = false;
   done.value = true;
   window.setTimeout(() => {
     if (router.currentRoute.value.name === "checkin") {
@@ -345,12 +361,15 @@ async function submitTimerMode() {
       <p v-else-if="autoClosed" class="checkin__forgot">{{ t('checkin.forgot_auto_closed', { since: forgotDayLabel }) }}</p>
       <p v-else class="checkin__time-hint">{{ t('checkin.time_hint') }}</p>
       <input
-        v-model="punchTime"
+        :value="punchTime"
         type="datetime-local"
+        @input="onPunchInput"
+        @change="onPunchInput"
         class="checkin__time-input"
         :min="punchMin"
         :max="punchMax"
       />
+      <p v-if="savedAtLabel" class="checkin__time-chosen">{{ t('checkin.saved_at', { time: savedAtLabel }) }}</p>
     </section>
 
     <section v-if="nextLogType === 'OUT'" class="checkin__activity">
@@ -466,6 +485,11 @@ async function submitTimerMode() {
 .checkin__time h3 { font-family: var(--font-display); font-size: 17px; margin: 16px 0 4px; font-weight: 400; }
 .checkin__time-hint { color: var(--ink-secondary); font-size: 13px; margin: 0 0 8px; }
 .checkin__forgot { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; background: #fff4e5; color: #8a4b00; border: 1px solid #f3c98b; }
+.checkin__time-chosen {
+  margin: 6px 0 0;
+  font-weight: 600;
+  color: var(--color-primary, inherit);
+}
 .checkin__time-input {
   width: 100%; box-sizing: border-box; padding: 12px; font: inherit;
   color: var(--ink-primary); background: var(--bg-surface);

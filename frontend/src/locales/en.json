@@ -167,7 +167,8 @@
     "checked_in_at": "Checked in at",
     "forgot_hint": "You did not check out after your shift that started {since}. Enter the time you finished work that day, then check in again.",
     "forgot_pick_time": "Please enter the time you finished that shift (within 16 hours of your check-in; a night shift finishes the next day).",
-    "forgot_auto_closed": "Your check-in of {since} was not closed. The system closes it with 8 hours and your supervisor checks it. You can check in now."
+    "forgot_auto_closed": "Your check-in of {since} was not closed. The system closes it with 8 hours and your supervisor checks it. You can check in now.",
+    "saved_at": "Will be saved as {time}"
   },
   "attendance": {
     "title": "Attendance",
