@@ -29,7 +29,8 @@ export const useApprovalsStore = defineStore("approvals", {
     async loadPending() {
       this.loading = true;
       try {
-        this.pending = await approvalsApi.listPending();
+        // a weekly approver (Cooperheat) can have a whole week waiting
+        this.pending = await approvalsApi.listPending(500);
       } finally {
         this.loading = false;
       }
@@ -63,6 +64,13 @@ export const useApprovalsStore = defineStore("approvals", {
      *  caller can tell "advanced a level" from "fully approved". */
     async approve(name: string, inTime?: string | null, outTime?: string | null) {
       const res = await approvalsApi.approve(name, inTime, outTime);
+      await Promise.all([this.loadPending(), this.loadDone(), this.loadSummary()]);
+      return res;
+    },
+
+    /** Online-only. Approves every listed record assigned to me in one go. */
+    async approveAll(names: string[]) {
+      const res = await approvalsApi.approveAll(names);
       await Promise.all([this.loadPending(), this.loadDone(), this.loadSummary()]);
       return res;
     },

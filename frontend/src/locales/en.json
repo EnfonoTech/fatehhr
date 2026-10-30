@@ -228,7 +228,11 @@
     "billable_hours": "Billable hours",
     "billable_same": "Billable (same as payable)",
     "save_hours": "Save hours",
-    "hours_saved": "Hours updated."
+    "hours_saved": "Hours updated.",
+    "approve_all": "Approve all ({n})",
+    "approve_all_confirm": "Approve all {n} records shown?",
+    "approve_all_done": "{ok} approved. {skipped} skipped (not waiting for you, or could not be approved).",
+    "approve_all_failed": "Could not approve. Please try again."
   },
   "leave": {
     "title": "Leave",

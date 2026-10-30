@@ -79,6 +79,13 @@ export const approvalsApi = {
       in_time: in_time ?? null,
       out_time: out_time ?? null,
     }),
+  /** Approves the listed records that are assigned to me; the server skips the rest. */
+  approveAll: (names: string[]) =>
+    apiCall<{ approved: string[]; failed: { name: string; error: string }[] }>(
+      "POST",
+      "fatehhr.api.approvals.approve_all",
+      { names: JSON.stringify(names) },
+    ),
   reject: (name: string, reason?: string | null) =>
     apiCall<ApprovalActionResult>("POST", "fatehhr.api.approvals.reject", {
       name,

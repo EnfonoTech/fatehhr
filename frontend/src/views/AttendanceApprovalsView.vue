@@ -39,6 +39,25 @@ onUnmounted(() => {
   if (tick) clearInterval(tick);
 });
 
+// Weekly approvers (Cooperheat 30 Oct): approve everything shown in one go. The server only
+// approves records assigned to me, with the same checks as one-by-one.
+const bulkBusy = ref(false);
+const bulkMsg = ref<string | null>(null);
+async function approveAllShown() {
+  const names = filteredPending.value.map((r) => r.name);
+  if (!names.length || !window.confirm(t("approvals.approve_all_confirm", { n: names.length }))) return;
+  bulkBusy.value = true;
+  bulkMsg.value = null;
+  try {
+    const res = await store.approveAll(names);
+    bulkMsg.value = t("approvals.approve_all_done", { ok: res.approved.length, skipped: names.length - res.approved.length });
+  } catch (e) {
+    bulkMsg.value = (e as Error).message || t("approvals.approve_all_failed");
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+
 function open(row: ApprovalRow) {
   router.push(`/approvals/${encodeURIComponent(row.name)}`);
 }
@@ -107,6 +126,12 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
 
     <!-- PENDING -->
     <template v-if="tab === 'pending'">
+      <div v-if="filteredPending.length > 1" class="appr__bulk">
+        <button class="appr__bulk-btn" :disabled="bulkBusy" @click="approveAllShown">
+          {{ t('approvals.approve_all', { n: filteredPending.length }) }}
+        </button>
+      </div>
+      <p v-if="bulkMsg" class="appr__bulk-msg">{{ bulkMsg }}</p>
       <button v-for="r in filteredPending" :key="r.name" class="ac" @click="open(r)">
         <span class="ac__avatar">{{ initials(r.employee_name, r.employee) }}</span>
         <span class="ac__body">
@@ -160,6 +185,13 @@ function windowLeft(iso: string | null): { text: string; expired: boolean } | nu
 </template>
 
 <style scoped>
+.appr__bulk { display: flex; justify-content: flex-end; margin: 4px 16px 8px; }
+.appr__bulk-btn {
+  border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 600;
+  background: var(--accent, #c00); color: var(--accent-ink, #fff);
+}
+.appr__bulk-btn:disabled { opacity: 0.6; }
+.appr__bulk-msg { margin: 0 16px 8px; font-size: 13px; color: var(--ink-secondary, #555); }
 .appr { padding: 0 var(--page-gutter) 120px; }
 .appr__search {
   width: 100%; box-sizing: border-box; margin: 0 0 14px;

@@ -337,6 +337,49 @@ def reject(name: str, reason: str | None = None) -> dict:
 	return _action(name, "reject", reason=reason)
 
 
+MAX_BULK = 500
+
+
+@frappe.whitelist()
+def approve_all(names=None) -> dict:
+	"""Approve several waiting records in one go (weekly approvers, Cooperheat 2026-10-30).
+
+	Only records assigned to the caller are approved, HR Managers included (they can see
+	everyone's, but a bulk approve must never approve the whole company). Each record goes
+	through the same checks as one approve; one that fails is skipped and reported.
+	"""
+	if not _enabled():
+		frappe.throw(_("Approvals are not enabled on this account."))
+	emp = _my_employee()
+	if not emp:
+		frappe.throw(_("No Employee linked to this user."), frappe.PermissionError)
+	wanted = frappe.parse_json(names) if isinstance(names, str) else (names or [])
+	if not wanted:
+		return {"approved": [], "failed": []}  # never "everything": the caller lists what it saw
+	mine = set(
+		frappe.get_all(
+			"Attendance",
+			filters={
+				"name": ["in", list(wanted)[:MAX_BULK]],
+				"current_approver": emp,
+				"workflow_state": ["in", PENDING_STATES],
+				"docstatus": 1,
+			},
+			pluck="name",
+			limit=MAX_BULK,
+		)
+	)
+	approved, failed = [], []
+	for name in sorted(mine):
+		try:
+			_action(name, "approve")
+			approved.append(name)
+		except Exception as e:
+			frappe.db.rollback()
+			failed.append({"name": name, "error": frappe.utils.strip_html(str(e))[:200]})
+	return {"approved": approved, "failed": failed}
+
+
 # ----------------------------------------------------------------------------
 # internals
 # ----------------------------------------------------------------------------
