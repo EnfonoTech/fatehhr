@@ -97,17 +97,31 @@ export async function markBundleReady(): Promise<void> {
   }
 }
 
+// Filesystem 6.0 downloadFile does not create missing folders (its `recursive` is ignored
+// there): make each parent folder first. An existing folder is fine.
+const madeDirs = new Set<string>();
+async function ensureParent(path: string): Promise<void> {
+  const dir = path.split("/").slice(0, -1).join("/");
+  if (!dir || madeDirs.has(dir)) return;
+  try {
+    await Filesystem.mkdir({ path: dir, directory: Directory.Data, recursive: true });
+  } catch {
+    /* already there */
+  }
+  madeDirs.add(dir);
+}
+
+async function download(url: string, path: string): Promise<void> {
+  await ensureParent(path);
+  await Filesystem.downloadFile({ url, path, directory: Directory.Data, recursive: true });
+}
+
 /** When online: fetch the manifest and download a newer bundle for the next start. */
 export async function checkForUpdate(): Promise<string | null> {
   if (!native()) return null;
   try {
     const tmp = `${ROOT}/manifest.json`;
-    await Filesystem.downloadFile({
-      url: `${base()}/manifest.json?t=${Date.now()}`,
-      path: tmp,
-      directory: Directory.Data,
-      recursive: true,
-    });
+    await download(`${base()}/manifest.json?t=${Date.now()}`, tmp);
     const raw = await Filesystem.readFile({ path: tmp, directory: Directory.Data, encoding: Encoding.UTF8 });
     const manifest = JSON.parse(String(raw.data));
     if (!validManifest(manifest) || !isNewer(manifest.version, BUNDLE_VERSION)) return null;
@@ -118,12 +132,7 @@ export async function checkForUpdate(): Promise<string | null> {
 
     const dir = `${ROOT}/${manifest.version}`;
     for (const f of manifest.files) {
-      await Filesystem.downloadFile({
-        url: `${base()}/${manifest.version}/${f.path}`,
-        path: `${dir}/${f.path}`,
-        directory: Directory.Data,
-        recursive: true,
-      });
+      await download(`${base()}/${manifest.version}/${f.path}`, `${dir}/${f.path}`);
       const st = await Filesystem.stat({ path: `${dir}/${f.path}`, directory: Directory.Data });
       if (f.size && st.size !== f.size) throw new Error("size mismatch " + f.path);
     }

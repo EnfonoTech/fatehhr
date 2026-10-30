@@ -1,1 +1,0 @@
-import{d as o,c as t,e as n,t as e,g as s,am as r,z as c}from"./index-CFLwc5aR.js";const _={class:"ver","aria-label":"Build version"},i=o({__name:"VersionBadge",setup(p){const a="261030-0711";return(d,l)=>(t(),n("p",_,"v"+e(s(r))+" · "+e(s(a)),1))}}),f=c(i,[["__scopeId","data-v-0f1e33e6"]]);export{f as V};

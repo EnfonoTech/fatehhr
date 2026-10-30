@@ -1,44 +1,44 @@
 {
- "version": "2610300710",
+ "version": "2610300731",
  "files": [
+  {
+   "path": "assets/AmountDisplay-BTsXH0Au.js",
+   "size": 678
+  },
   {
    "path": "assets/AmountDisplay-BoZ9CiYK.css",
    "size": 437
   },
   {
-   "path": "assets/AmountDisplay-guXjskJB.js",
-   "size": 678
+   "path": "assets/AnnouncementDetailView-CYyuzZy3.js",
+   "size": 55613
   },
   {
    "path": "assets/AnnouncementDetailView-DIxvgSRD.css",
    "size": 1003
   },
   {
-   "path": "assets/AnnouncementDetailView-D_sBu_LI.js",
-   "size": 55613
+   "path": "assets/AnnouncementListView-BH4QreqA.js",
+   "size": 1313
   },
   {
    "path": "assets/AnnouncementListView-Da3iG_VK.css",
    "size": 566
   },
   {
-   "path": "assets/AnnouncementListView-DnVrkld3.js",
-   "size": 1313
-  },
-  {
-   "path": "assets/App-DmSiWFXj.js",
+   "path": "assets/App-BoPavQRz.js",
    "size": 62
-  },
-  {
-   "path": "assets/AttendanceApprovalDetailView-C21YlT0e.js",
-   "size": 11499
   },
   {
    "path": "assets/AttendanceApprovalDetailView-CawCmwbA.css",
    "size": 2929
   },
   {
-   "path": "assets/AttendanceApprovalsView-Dq6ijUUe.js",
+   "path": "assets/AttendanceApprovalDetailView-CvFSLpFk.js",
+   "size": 11499
+  },
+  {
+   "path": "assets/AttendanceApprovalsView-BXOxKbvT.js",
    "size": 4740
   },
   {
@@ -46,7 +46,7 @@
    "size": 2740
   },
   {
-   "path": "assets/AttendanceCalendarView-BXqmDjnT.js",
+   "path": "assets/AttendanceCalendarView-B4WyFmW2.js",
    "size": 4837
   },
   {
@@ -54,7 +54,7 @@
    "size": 2083
   },
   {
-   "path": "assets/BottomNav-BKaVqRjk.js",
+   "path": "assets/BottomNav-Ba4rxzmP.js",
    "size": 776
   },
   {
@@ -62,7 +62,7 @@
    "size": 740
   },
   {
-   "path": "assets/BottomSheet-CGkdViY8.js",
+   "path": "assets/BottomSheet-BaFryGXU.js",
    "size": 682
   },
   {
@@ -70,23 +70,23 @@
    "size": 944
   },
   {
-   "path": "assets/Button-CgF29rLc.css",
-   "size": 1057
+   "path": "assets/Button-CYxVlhh2.js",
+   "size": 453
   },
   {
-   "path": "assets/Button-CmWng4sQ.js",
-   "size": 453
+   "path": "assets/Button-CgF29rLc.css",
+   "size": 1057
   },
   {
    "path": "assets/Card-BAk-1D3p.css",
    "size": 114
   },
   {
-   "path": "assets/Card-G26L_gqK.js",
+   "path": "assets/Card-SmjHFyY3.js",
    "size": 237
   },
   {
-   "path": "assets/CheckinHistoryView-Ca45WNZ5.js",
+   "path": "assets/CheckinHistoryView-DM2NWx4Q.js",
    "size": 1527
   },
   {
@@ -94,23 +94,23 @@
    "size": 1217
   },
   {
-   "path": "assets/CheckinView-3t3fXZuz.js",
-   "size": 160283
-  },
-  {
    "path": "assets/CheckinView-BNmGoBbD.css",
    "size": 20700
   },
   {
-   "path": "assets/Chip-BVzjMEkE.js",
-   "size": 392
+   "path": "assets/CheckinView-jkpjkiXn.js",
+   "size": 160283
   },
   {
    "path": "assets/Chip-Belcs0s9.css",
    "size": 776
   },
   {
-   "path": "assets/DashboardView-5BNpsEt1.js",
+   "path": "assets/Chip-DJgwcaqD.js",
+   "size": 392
+  },
+  {
+   "path": "assets/DashboardView-B6RoQGa2.js",
    "size": 6781
   },
   {
@@ -122,51 +122,51 @@
    "size": 1014
   },
   {
-   "path": "assets/ExpenseClaimView-DSwk6LAP.js",
+   "path": "assets/ExpenseClaimView-DT2xt9GD.js",
    "size": 3912
+  },
+  {
+   "path": "assets/ExpenseListView-C61TbJad.js",
+   "size": 4726
   },
   {
    "path": "assets/ExpenseListView-DDjh0SCb.css",
    "size": 3950
   },
   {
-   "path": "assets/ExpenseListView-DG_tCa83.js",
-   "size": 4726
+   "path": "assets/Icon-4gNF5Txz.js",
+   "size": 3901
   },
   {
    "path": "assets/Icon-B0_sPeT8.css",
    "size": 125
   },
   {
-   "path": "assets/Icon-CZZ4-HNh.js",
-   "size": 3901
-  },
-  {
-   "path": "assets/LeaveApplyView-BLmIqp_q.js",
-   "size": 6176
-  },
-  {
    "path": "assets/LeaveApplyView-DLn4vvz-.css",
    "size": 2349
+  },
+  {
+   "path": "assets/LeaveApplyView-PMKChtVN.js",
+   "size": 6176
   },
   {
    "path": "assets/LeaveHubView-CUGH4vWE.css",
    "size": 3409
   },
   {
-   "path": "assets/LeaveHubView-CmoiRfMJ.js",
+   "path": "assets/LeaveHubView-D7EgwF99.js",
    "size": 5929
+  },
+  {
+   "path": "assets/LeaveListView-CT4xBR-c.js",
+   "size": 3917
   },
   {
    "path": "assets/LeaveListView-DXetjmF5.css",
    "size": 1251
   },
   {
-   "path": "assets/LeaveListView-oGWI5T88.js",
-   "size": 3917
-  },
-  {
-   "path": "assets/ListRow-BQoFgZqb.js",
+   "path": "assets/ListRow-1Mh0SmyY.js",
    "size": 596
   },
   {
@@ -174,7 +174,7 @@
    "size": 578
   },
   {
-   "path": "assets/LoginView-BP17PGC5.js",
+   "path": "assets/LoginView-Bx9O_KN3.js",
    "size": 2863
   },
   {
@@ -186,11 +186,11 @@
    "size": 3963
   },
   {
-   "path": "assets/MoreView-kPz3bi-N.js",
+   "path": "assets/MoreView-DFIyi1ce.js",
    "size": 6681
   },
   {
-   "path": "assets/NotificationView-DzHNX6R-.js",
+   "path": "assets/NotificationView-CFzfgGth.js",
    "size": 985
   },
   {
@@ -198,15 +198,15 @@
    "size": 102
   },
   {
-   "path": "assets/PayslipDetailView-82WvLOa3.js",
-   "size": 2425
-  },
-  {
    "path": "assets/PayslipDetailView-C13MTvz8.css",
    "size": 666
   },
   {
-   "path": "assets/PayslipListView-BoMI-DRb.js",
+   "path": "assets/PayslipDetailView-DJf8mpGB.js",
+   "size": 2425
+  },
+  {
+   "path": "assets/PayslipListView-CZi-gFbQ.js",
    "size": 1054
   },
   {
@@ -214,7 +214,7 @@
    "size": 141
   },
   {
-   "path": "assets/PhotoSlot-f_99AAtg.js",
+   "path": "assets/PhotoSlot-CMe3jKFL.js",
    "size": 1449
   },
   {
@@ -222,15 +222,15 @@
    "size": 836
   },
   {
-   "path": "assets/PinView-CMCdLBLA.js",
-   "size": 4105
-  },
-  {
    "path": "assets/PinView-Dk_TA83M.css",
    "size": 3300
   },
   {
-   "path": "assets/ProfileView-D4fzrR1H.js",
+   "path": "assets/PinView-LnZLXwGD.js",
+   "size": 4105
+  },
+  {
+   "path": "assets/ProfileView-CHRKbt_K.js",
    "size": 6040
   },
   {
@@ -242,11 +242,11 @@
    "size": 2006
   },
   {
-   "path": "assets/RequestDetailView-Cp-dviaD.js",
+   "path": "assets/RequestDetailView-N193ICSK.js",
    "size": 4711
   },
   {
-   "path": "assets/RequestListView-8CpMyBf7.js",
+   "path": "assets/RequestListView-COsjkcyC.js",
    "size": 2734
   },
   {
@@ -254,39 +254,39 @@
    "size": 1313
   },
   {
-   "path": "assets/RequestNewView-BMNVNoUg.js",
-   "size": 1600
-  },
-  {
    "path": "assets/RequestNewView-C8aqVF6X.css",
    "size": 624
+  },
+  {
+   "path": "assets/RequestNewView-CfbzD_Ad.js",
+   "size": 1600
   },
   {
    "path": "assets/SyncBar-8XUj0kIt.css",
    "size": 772
   },
   {
-   "path": "assets/SyncBar-B9B9mfKn.js",
+   "path": "assets/SyncBar-cvjlH-fo.js",
    "size": 1367
-  },
-  {
-   "path": "assets/SyncErrorsView-BpKYCjQ-.js",
-   "size": 1833
   },
   {
    "path": "assets/SyncErrorsView-D1Tb_NAe.css",
    "size": 661
   },
   {
+   "path": "assets/SyncErrorsView-DU820w_L.js",
+   "size": 1833
+  },
+  {
    "path": "assets/TaskListView-B0w-RsK4.css",
    "size": 657
   },
   {
-   "path": "assets/TaskListView-C6w33lvo.js",
+   "path": "assets/TaskListView-sAMjYRqa.js",
    "size": 2002
   },
   {
-   "path": "assets/TopAppBar-BHOnrnN3.js",
+   "path": "assets/TopAppBar-BYQWBB6o.js",
    "size": 456
   },
   {
@@ -294,120 +294,120 @@
    "size": 632
   },
   {
+   "path": "assets/VersionBadge-7iXgnHCJ.js",
+   "size": 309
+  },
+  {
    "path": "assets/VersionBadge-BcOdLcQK.css",
    "size": 190
   },
   {
-   "path": "assets/VersionBadge-YxFTOdBr.js",
-   "size": 309
-  },
-  {
-   "path": "assets/announcement-B4VouQ2L.js",
+   "path": "assets/announcement-DzQq4fIY.js",
    "size": 442
   },
   {
-   "path": "assets/approvals-CL5Lak67.js",
+   "path": "assets/approvals-xYB-nb80.js",
    "size": 1594
   },
   {
-   "path": "assets/auth-DG70bg3y.js",
+   "path": "assets/auth-ijy5O_Vx.js",
    "size": 441
   },
   {
-   "path": "assets/base-Dsl0v9le.js",
+   "path": "assets/base-CLcPmCvZ.js",
    "size": 433
   },
   {
-   "path": "assets/biometric-DgLUUoJP.js",
+   "path": "assets/biometric-CPL1ACFi.js",
    "size": 3058
   },
   {
-   "path": "assets/checkin-Buz1Bac2.js",
+   "path": "assets/checkin-PirjXyJE.js",
    "size": 3379
   },
   {
-   "path": "assets/expense-CFw-jwNv.js",
+   "path": "assets/expense-CPY4K0-H.js",
    "size": 1392
   },
   {
-   "path": "assets/forgot-checkout-Dpy5UdCE.js",
+   "path": "assets/forgot-checkout-WjjpQkWZ.js",
    "size": 1138
   },
   {
-   "path": "assets/index-BqqJ2Vro.js",
-   "size": 334
+   "path": "assets/index-CHEYogtM.js",
+   "size": 231768
   },
   {
    "path": "assets/index-Cda_hHZW.css",
    "size": 3194
   },
   {
-   "path": "assets/index-CixWkkI_.js",
-   "size": 231768
+   "path": "assets/index-ev14p1PE.js",
+   "size": 334
   },
   {
-   "path": "assets/leave-CXvRcEmu.js",
+   "path": "assets/leave-w5f3h-hw.js",
    "size": 1664
   },
   {
-   "path": "assets/live-update-spX1W-tu.js",
-   "size": 2261
+   "path": "assets/live-update-BAahuQuz.js",
+   "size": 2427
   },
   {
-   "path": "assets/native-DqJZ-ga5.js",
+   "path": "assets/native-Css5un_m.js",
    "size": 777
   },
   {
-   "path": "assets/notification-DnyW1UMw.js",
+   "path": "assets/notification-0xZrHhx_.js",
    "size": 557
   },
   {
-   "path": "assets/payslip-Czh3IUU2.js",
+   "path": "assets/payslip-CcRSG7lt.js",
    "size": 1213
   },
   {
-   "path": "assets/profile-GtOPCjaV.js",
+   "path": "assets/profile-B-CGqdyr.js",
    "size": 675
   },
   {
-   "path": "assets/request-CicbI87d.js",
+   "path": "assets/request-CUWijmzU.js",
    "size": 590
   },
   {
-   "path": "assets/request-DrQzE_jL.js",
+   "path": "assets/request-CXhs-cQM.js",
    "size": 288
   },
   {
-   "path": "assets/tasks-D8zYRiUE.js",
+   "path": "assets/tasks-cm5x8IZh.js",
    "size": 2915
   },
   {
-   "path": "assets/web-BG7HPNIr.js",
-   "size": 943
+   "path": "assets/web-BC8WnZsM.js",
+   "size": 2245
   },
   {
-   "path": "assets/web-BLaLy9zV.js",
-   "size": 1154
-  },
-  {
-   "path": "assets/web-CkLENPHa.js",
-   "size": 1246
-  },
-  {
-   "path": "assets/web-CozXvJr-.js",
+   "path": "assets/web-BxDKKloA.js",
    "size": 917
   },
   {
-   "path": "assets/web-DSa336EM.js",
-   "size": 675
-  },
-  {
-   "path": "assets/web-DYHTx5hn.js",
+   "path": "assets/web-DCBzehwz.js",
    "size": 8624
   },
   {
-   "path": "assets/web-U7FNygHu.js",
-   "size": 2245
+   "path": "assets/web-DK-wo_cg.js",
+   "size": 1154
+  },
+  {
+   "path": "assets/web-DwMhGM8f.js",
+   "size": 675
+  },
+  {
+   "path": "assets/web-G0JxmP3N.js",
+   "size": 1246
+  },
+  {
+   "path": "assets/web-q6KD_TIP.js",
+   "size": 943
   },
   {
    "path": "bundle-version.txt",

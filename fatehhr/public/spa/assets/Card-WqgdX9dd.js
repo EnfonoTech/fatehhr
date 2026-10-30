@@ -1,0 +1,1 @@
+import{z as c,c as s,e as o,K as r}from"./index-DIvzAqxi.js";const t={},a={class:"card"};function n(e,d){return s(),o("div",a,[r(e.$slots,"default",{},void 0)])}const f=c(t,[["render",n],["__scopeId","data-v-e9587e4c"]]);export{f as C};
